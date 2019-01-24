@@ -37,7 +37,7 @@ def train(config, mode):
     sess = tf.Session(config = tf.ConfigProto(allow_soft_placement = True, log_device_placement = False))
 
     ## DEFINE MODEL
-    stabNet = StabNet(config.height, config.width, config.F_dim, is_train = True)
+    stabNet = StabNet(config.height, config.width)
 
     ## DEFINE DATA LOADERS
     print(toGreen('Loading dataloader...'))
@@ -422,7 +422,6 @@ if __name__ == '__main__':
     parser.add_argument('-gc', '--grad_norm_clip_val', type = float, default = 5., help = 'gradient norm clipping value')
     parser.add_argument('-lr', '--learning_rate', type = float, default = 1e-2, help = 'learning_rate')
     parser.add_argument('-sk', '--skip_length', type=int, default = config_init.TRAIN.skip_length, help = 'limits of losses that controls coefficients')
-    parser.add_argument('-tpf', '--train_PF', type=str, default = config_init.TRAIN.train_PF, help = 'limits of losses that controls coefficients')
 
     parser.add_argument('-la',  '--loss_applied', type = str , default = str(config_init.TRAIN.loss_applied), help = 'losses to use')
     parser.add_argument('-lm', '--loss_limit', type=json.loads, default = config_init.TRAIN.loss_limit, help = 'limits of losses that controls coefficients')
@@ -460,7 +459,6 @@ if __name__ == '__main__':
         config.TRAIN.grad_norm_clip_val = args.grad_norm_clip_val
         config.TRAIN.lr_init = args.learning_rate
         config.TRAIN.skip_length = args.skip_length
-        config.TRAIN.train_PF = t_or_f(args.train_PF)
 
         config.TRAIN.loss_applied = string_to_array(args.loss_applied)
         config.TRAIN.loss_limit = get_dict_with_list(config.TRAIN.loss_applied, args.loss_limit)
