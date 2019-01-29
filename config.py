@@ -85,6 +85,9 @@ def get_config(mode = ''):
     # data options
     config.TRAIN.PRETRAIN.sample_num = config.TRAIN.sample_num
     config.TRAIN.PRETRAIN.skip_length = config.TRAIN.skip_length
+
+    # logs
+    config.TRAIN.PRETRAIN.write_ckpt_every_itr = 300
     # log dirs
     config.TRAIN.PRETRAIN.LOG_DIR = edict()
     offset = '/Jarvis/logs/junyonglee'
