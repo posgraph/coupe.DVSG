@@ -2,11 +2,13 @@ import tensorflow as tf
 import tensorlayer as tl
 import tensorflow.contrib.slim as slim
 from tensorflow.contrib.slim.nets import resnet_v2
+import numpy as np
 
 import collections
 
 from warp_with_optical_flow import *
-from spatial_transformer import *
+from ThinPlateSpline2 import ThinPlateSpline as stn
+from spatial_transformer import ProjectiveTransformer
 from networks import *
 
 class StabNet:
@@ -14,10 +16,14 @@ class StabNet:
         self.h = h
         self.w = w
         self.c = 3
-        self.control_point_num = 5 # grid_num (4) + 1
-        self.reuse = collections.OrderedDict()
-        self.elastic_transformer = ElasticTransformer(out_size = [self.h, self.w], param_dim = 2 * self.control_point_num ** 2, param_dim_per_side = self.control_point_num)
+        self.s_ = np.array([ # source position
+          [-1, -1],[-0.5, -1],[0, -1],[0.5, -1],[1, -1],
+          [-1, -0.5],[-0.5, -0.5],[0, -0.5],[0.5, -0.5],[1, -0.5],
+          [-1, 0],[-0.5, 0],[0, 0],[0.5, 0],[1, 0],
+          [-1, 0.5],[-0.5, 0.5],[0, 0.5],[0.5, 0.5],[1, 0.5],
+          [-1, 1],[-0.5, 1],[0, 1],[0.5, 1],[1, 1]])
 
+        self.reuse = collections.OrderedDict()
 
     def init_pretrain_inputs(self, sample_num):
         self.sample_num = sample_num
@@ -56,19 +62,19 @@ class StabNet:
         outputs['patches_masked_t_1'], outputs['random_masks_t_1'] = self.random_mask(self.inputs['patches_t_1'], [self.h, self.w], self.sample_num)
         outputs['patches_masked_t'], outputs['random_masks_t'] = self.random_mask(self.inputs['patches_t'], [self.h, self.w], self.sample_num)
 
+        self.s = tf.tile(tf.constant(self.s_.reshape([1, 25, 2]), dtype=tf.float32), [tf.shape(self.inputs['u_t_1'])[0], 1, 1])
+    
         with tf.variable_scope('stabNet') as scope:
             ## Regressor
             outputs['F_t_1'] = localizationNet(outputs['patches_masked_t_1'], is_train, self.get_reuse('stabNet'), scope = scope)
             outputs['F_t'] = localizationNet(outputs['patches_masked_t'], is_train, self.get_reuse('stabNet'), scope = scope)
 
             ## STN
-            stl_affine = ProjectiveTransformer([self.h, self.w])
+            outputs['s_t_1_pred'], outputs['x_offset_t_1'], outputs['y_offset_t_1'] = stn(self.inputs['u_t_1'], self.s, outputs['F_t_1'], [self.h, self.w])
+            outputs['s_t_1_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t_1']), self.s, outputs['F_t_1'], [self.h, self.w])
 
-            outputs['s_t_1_pred'], outputs['x_offset_t_1'], outputs['y_offset_t_1'] = self.elastic_transformer.transform(self.inputs['u_t_1'], outputs['F_t_1'])
-            outputs['s_t_1_pred_mask'], _, _ = self.elastic_transformer.transform(tf.ones_like(self.inputs['u_t_1']), outputs['F_t_1'])
-
-            outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = self.elastic_transformer.transform(self.inputs['u_t'], outputs['F_t'])
-            outputs['s_t_pred_mask'], _, _ = self.elastic_transformer.transform(tf.ones_like(self.inputs['u_t']), outputs['F_t'])
+            outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(self.inputs['u_t'], self.s, outputs['F_t'], [self.h, self.w])
+            outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t']), self.s, outputs['F_t'], [self.h, self.w])
             outputs['s_t_pred_warped'] = tf_warp(outputs['s_t_pred'], self.inputs['of_t'], self.h, self.w)
             outputs['s_t_pred_warped_mask'] = tf_warp(outputs['s_t_pred_mask'], self.inputs['of_t'], self.h, self.w)
 

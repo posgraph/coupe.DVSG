@@ -114,8 +114,8 @@ def ThinPlateSpline2(U, source, target, out_size):
     num_batch = tf.shape(input_dim)[0]
     height = tf.shape(input_dim)[1]
     width = tf.shape(input_dim)[2]
-    num_channels = tf.shape(input_dim)[3]
-
+    # num_channels = tf.shape(input_dim)[3]
+    _, _, _, num_channels = input_dim.get_shape().as_list()
     # grid of (x_t, y_t, 1), eq (1) in ref [1]
     height_f = tf.cast(height, 'float32')
     width_f = tf.cast(width, 'float32')
@@ -166,4 +166,5 @@ def ThinPlateSpline2(U, source, target, out_size):
 
   T = _solve_system(source, target)
   x, y, output = _transform(T, source, U, out_size)
-  return x, y, output
+
+  return output, x, y

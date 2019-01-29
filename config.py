@@ -70,7 +70,7 @@ def get_config(mode = ''):
 
     #################################### PRETRAIN ###################################
     config.TRAIN.PRETRAIN = edict()
-    config.TRAIN.PRETRAIN.n_epoch = 10000
+    config.TRAIN.PRETRAIN.n_epoch = 10
     # learning rate
     config.TRAIN.PRETRAIN.lr_init = config.TRAIN.lr_init
     config.TRAIN.PRETRAIN.lr_decay_rate = config.TRAIN.lr_decay_rate

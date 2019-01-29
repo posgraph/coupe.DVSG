@@ -73,9 +73,9 @@ class Trainer:
             print(var.name)
 
     def build_loss_pretrain(self, outputs_train, outputs_test):
-        self.pretrain_loss = collections.OrderedDict()
         batch_size = tf.shape(outputs_train['F_t'])[0]
-        identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
+        identity = self.network.s
+        self.pretrain_loss = collections.OrderedDict()
         with tf.name_scope('pretrain_loss'):
             self.pretrain_loss['identity_image'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
                                             + tl.cost.mean_squared_error(outputs_train['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_image_t')
@@ -96,8 +96,8 @@ class Trainer:
 
     def build_loss_train(self, outputs_train, outputs_test):
         batch_size = tf.shape(outputs_train['F_t'])[0]
+        identity = self.network.s
         self.loss = collections.OrderedDict()
-        identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
         with tf.name_scope('loss'):
             self.loss['image'] = self.masked_MSE(outputs_train['s_t_1_pred'], self.inputs['s_t_1_gt'], outputs_train['s_t_1_pred_mask'], 'loss_image_t_1')\
                                + self.masked_MSE(outputs_train['s_t_pred'], self.inputs['s_t_gt'], outputs_train['s_t_pred_mask'], 'loss_image_t')

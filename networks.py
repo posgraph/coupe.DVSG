@@ -29,5 +29,6 @@ def localizationNet(input, is_train = False, reuse = False, scope = 'resnet_v1_5
         net = tl.layers.DenseLayer(net, n_units = 50, act = tf.identity, name='df/dense4')
 
         thetas_affine = net.outputs
+        thetas_affine = tf.reshape(thetas_affine, [-1, 25, 2])
 
     return thetas_affine
