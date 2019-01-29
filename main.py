@@ -98,7 +98,7 @@ def train(config, mode):
                     writer_image_init.add_summary(summary_image, global_step)
 
                 # save checkpoint
-                if (global_step) % config.write_ckpt_every_itr == 0:
+                if (global_step) % config.PRETRAIN.write_ckpt_every_itr == 0:
                     ckpt_manager_init_itr.save_ckpt(sess, trainer.pretraining_save_vars, '{:05d}_{:05d}'.format(epoch, global_step), score = errs_total_pretrain['total'] / (idx + 1))
 
                 print_logs('PRETRAIN', mode, epoch, step_time, idx, data_loader.num_itr, errs = errs, coefs = trainer.coef_container, lr = lr)
