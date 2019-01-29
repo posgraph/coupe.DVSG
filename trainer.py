@@ -74,7 +74,8 @@ class Trainer:
 
     def build_loss_pretrain(self, outputs_train, outputs_test):
         batch_size = tf.shape(outputs_train['F_t'])[0]
-        identity = self.network.s
+        #identity = self.network.s
+        identity = tf.zeros([batch_size, 25, 2])
         self.pretrain_loss = collections.OrderedDict()
         with tf.name_scope('pretrain_loss'):
             self.pretrain_loss['identity_image'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
@@ -96,7 +97,7 @@ class Trainer:
 
     def build_loss_train(self, outputs_train, outputs_test):
         batch_size = tf.shape(outputs_train['F_t'])[0]
-        identity = self.network.s
+        identity = tf.zeros([batch_size, 25, 2])
         self.loss = collections.OrderedDict()
         with tf.name_scope('loss'):
             self.loss['image'] = self.masked_MSE(outputs_train['s_t_1_pred'], self.inputs['s_t_1_gt'], outputs_train['s_t_1_pred_mask'], 'loss_image_t_1')\
@@ -203,8 +204,9 @@ class Trainer:
         image_sum_list.append(tf.summary.image('7_s_t_1_gt', fix_image_tf(self.inputs['s_t_1_gt'], 1)))
         image_sum_list.append(tf.summary.image('8_s_t_1_pred_mask', fix_image_tf(self.outputs_train['s_t_1_pred_mask'], 1)))
 
-        image_sum_list.append(tf.summary.image('9_s_t_pred_warped', fix_image_tf(self.outputs_train['s_t_pred_warped'], 1)))
-        image_sum_list.append(tf.summary.image('10_s_t_pred_warped_mask', fix_image_tf(self.outputs_train['s_t_pred_warped_mask'], 1)))
+        image_sum_list.append(tf.summary.image('9_s_t_gt_warped', fix_image_tf(self.outputs_train['s_t_gt_warped'], 1)))
+        image_sum_list.append(tf.summary.image('10_s_t_pred_warped', fix_image_tf(self.outputs_train['s_t_pred_warped'], 1)))
+        image_sum_list.append(tf.summary.image('11_s_t_pred_warped_mask', fix_image_tf(self.outputs_train['s_t_pred_warped_mask'], 1)))
         image_sum = tf.summary.merge(image_sum_list)
 
         with tf.name_scope('loss_epoch'):

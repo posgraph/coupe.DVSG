@@ -7,7 +7,7 @@ import numpy as np
 import collections
 
 from warp_with_optical_flow import *
-from ThinPlateSpline2 import ThinPlateSpline as stn
+from ThinPlateSpline import ThinPlateSpline as stn
 from spatial_transformer import ProjectiveTransformer
 from networks import *
 
@@ -77,6 +77,8 @@ class StabNet:
             outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t']), self.s, outputs['F_t'], [self.h, self.w])
             outputs['s_t_pred_warped'] = tf_warp(outputs['s_t_pred'], self.inputs['of_t'], self.h, self.w)
             outputs['s_t_pred_warped_mask'] = tf_warp(outputs['s_t_pred_mask'], self.inputs['of_t'], self.h, self.w)
+
+            outputs['s_t_gt_warped'] = tf_warp(self.inputs['s_t_gt'], self.inputs['of_t'], self.h, self.w)
 
         return outputs
 
