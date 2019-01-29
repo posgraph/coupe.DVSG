@@ -23,9 +23,9 @@ def localizationNet(input, is_train = False, reuse = False, scope = 'resnet_v1_5
 
         net = tl.layers.InputLayer(net)
         net = tl.layers.FlattenLayer(net, name = 'flatten')
-        net = tl.layers.DenseLayer(net, n_units = 2048, act = tf.identity, name='df/dense1')
-        net = tl.layers.DenseLayer(net, n_units = 1024, act = tf.identity, name='df/dense2')
-        net = tl.layers.DenseLayer(net, n_units = 512, act = tf.identity, name='df/dense3')
+        net = tl.layers.DenseLayer(net, n_units = 2048, act = lrelu, name='df/dense1')
+        net = tl.layers.DenseLayer(net, n_units = 1024, act = lrelu, name='df/dense2')
+        net = tl.layers.DenseLayer(net, n_units = 512, act = lrelu, name='df/dense3')
         net = tl.layers.DenseLayer(net, n_units = 50, act = tf.identity, name='df/dense4')
 
         thetas_affine = net.outputs

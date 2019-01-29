@@ -420,7 +420,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-b', '--batch_size', type = int, default = config_init.TRAIN.batch_size, help = 'whether to train or not')
     parser.add_argument('-gc', '--grad_norm_clip_val', type = float, default = 5., help = 'gradient norm clipping value')
-    parser.add_argument('-lr', '--learning_rate', type = float, default = 1e-2, help = 'learning_rate')
+    parser.add_argument('-lr', '--learning_rate', type = float, default = 1e-3, help = 'learning_rate')
     parser.add_argument('-sk', '--skip_length', type=int, default = config_init.TRAIN.skip_length, help = 'limits of losses that controls coefficients')
 
     parser.add_argument('-la',  '--loss_applied', type = str , default = str(config_init.TRAIN.loss_applied), help = 'losses to use')
@@ -433,7 +433,7 @@ if __name__ == '__main__':
     parser.add_argument('-pt', '--is_pretrain', type = str , default = 'false', help = 'whether to pretrain or not')
     parser.add_argument('-pto', '--pretrain_only', type = str , default = 'false', help = 'whether to pretrain or not')
     parser.add_argument('-pdl', '--pdelete_log', type = str , default = 'false', help = 'whether to delete log or not')
-    parser.add_argument('-plr', '--pretrain_learning_rate', type = float, default = 1e-2, help = 'learning_rate')
+    parser.add_argument('-plr', '--pretrain_learning_rate', type = float, default = None, help = 'learning_rate')
 
     parser.add_argument('-pla',  '--ploss_applied', type = str , default = None, help = 'losses to use')
     parser.add_argument('-plm', '--ploss_limit', type=json.loads, default = None, help = 'limits of losses that controls coefficients')
@@ -468,7 +468,7 @@ if __name__ == '__main__':
         config.TRAIN.coef_high = get_dict_with_list(config.TRAIN.loss_applied, args.coef_high) if args.coef_high is not None else config.TRAIN.coef_init
 
         config.TRAIN.PRETRAIN.delete_log = t_or_f(args.pdelete_log)
-        config.TRAIN.PRETRAIN.lr_init = args.pretrain_learning_rate
+        config.TRAIN.PRETRAIN.lr_init = args.pretrain_learning_rate if args.pretrain_learning_rate is not None else args.learning_rate
         config.TRAIN.PRETRAIN.loss_applied = string_to_array(args.ploss_applied) if args.ploss_applied is not None else config.TRAIN.loss_applied
         config.TRAIN.PRETRAIN.loss_limit = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.ploss_limit) if args.ploss_limit is not None else config.TRAIN.loss_limit
         config.TRAIN.PRETRAIN.loss_apply_epoch_range = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.ploss_apply_epoch_range, default_val = config.TRAIN.PRETRAIN.n_epoch) if args.ploss_apply_epoch_range is not None else config.TRAIN.loss_apply_epoch_range

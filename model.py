@@ -43,8 +43,8 @@ class StabNet:
 
             self.inputs['of_t'] = tf.placeholder('float32', [None, None, None, 2], name = 'optical_flow_t')
 
-            self.inputs['surfs_t_1'] = tf.placeholder('float32', [None, 2, None, 2], name = 'surfs_t_1')
-            self.inputs['surfs_t'] = tf.placeholder('float32', [None, 2, None, 2], name = 'surfs_t')
+            self.inputs['surfs_t_1'] = tf.placeholder('int32', [None, 2, None, 2], name = 'surfs_t_1')
+            self.inputs['surfs_t'] = tf.placeholder('int32', [None, 2, None, 2], name = 'surfs_t')
 
             self.inputs['surfs_dim_t_1'] = tf.placeholder('float32', [None], name = 'surfs_dim_t_1')
             self.inputs['surfs_dim_t'] = tf.placeholder('float32', [None], name = 'surfs_dim_t')
@@ -64,11 +64,11 @@ class StabNet:
             ## STN
             stl_affine = ProjectiveTransformer([self.h, self.w])
 
-            outputs['s_t_1_pred'] = self.elastic_transformer.transform(self.inputs['u_t_1'], outputs['F_t_1'])
-            outputs['s_t_1_pred_mask'] = self.elastic_transformer.transform(tf.ones_like(self.inputs['u_t_1']), outputs['F_t_1'])
+            outputs['s_t_1_pred'], outputs['x_offset_t_1'], outputs['y_offset_t_1'] = self.elastic_transformer.transform(self.inputs['u_t_1'], outputs['F_t_1'])
+            outputs['s_t_1_pred_mask'], _, _ = self.elastic_transformer.transform(tf.ones_like(self.inputs['u_t_1']), outputs['F_t_1'])
 
-            outputs['s_t_pred'] = self.elastic_transformer.transform(self.inputs['u_t'], outputs['F_t'])
-            outputs['s_t_pred_mask'] = self.elastic_transformer.transform(tf.ones_like(self.inputs['u_t']), outputs['F_t'])
+            outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = self.elastic_transformer.transform(self.inputs['u_t'], outputs['F_t'])
+            outputs['s_t_pred_mask'], _, _ = self.elastic_transformer.transform(tf.ones_like(self.inputs['u_t']), outputs['F_t'])
             outputs['s_t_pred_warped'] = tf_warp(outputs['s_t_pred'], self.inputs['of_t'], self.h, self.w)
             outputs['s_t_pred_warped_mask'] = tf_warp(outputs['s_t_pred_mask'], self.inputs['of_t'], self.h, self.w)
 

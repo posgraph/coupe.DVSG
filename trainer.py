@@ -74,28 +74,40 @@ class Trainer:
 
     def build_loss_pretrain(self, outputs_train, outputs_test):
         self.pretrain_loss = collections.OrderedDict()
+        batch_size = tf.shape(outputs_train['F_t'])[0]
+        identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
         with tf.name_scope('pretrain_loss'):
-            self.pretrain_loss['identity'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_t_1')\
-                                            + tl.cost.mean_squared_error(outputs_train['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_t')
+            self.pretrain_loss['identity_image'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
+                                            + tl.cost.mean_squared_error(outputs_train['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_image_t')
+            self.pretrain_loss['identity_param'] = tl.cost.mean_squared_error(outputs_train['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
+                                            + tl.cost.mean_squared_error(outputs_train['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
             self.pretrain_loss = self.gather_only_applied_loss(self.pretrain_loss, self.loss_applied)
             self.pretrain_loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.pretrain_loss.items()], name = 'loss_total')
             print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in self.pretrain_loss.items()]))))
 
         self.pretrain_loss_test = collections.OrderedDict()
-        with tf.name_scope('pretrain_loss'):
-            self.pretrain_loss_test['identity'] = tl.cost.mean_squared_error(outputs_test['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_t_1')\
-                                            + tl.cost.mean_squared_error(outputs_test['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_t')
+        with tf.name_scope('pretrain_loss_test'):
+            self.pretrain_loss_test['identity_image'] = tl.cost.mean_squared_error(outputs_test['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
+                                            + tl.cost.mean_squared_error(outputs_test['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_image_t')
+            self.pretrain_loss_test['identity_param'] = tl.cost.mean_squared_error(outputs_test['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
+                                            + tl.cost.mean_squared_error(outputs_test['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
             self.pretrain_loss_test = self.gather_only_applied_loss(self.pretrain_loss_test, self.loss_applied)
             self.pretrain_loss_test['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.pretrain_loss_test.items()], name = 'loss_total')
 
     def build_loss_train(self, outputs_train, outputs_test):
         batch_size = tf.shape(outputs_train['F_t'])[0]
         self.loss = collections.OrderedDict()
+        identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
         with tf.name_scope('loss'):
-            #self.loss['identity'] = tl.cost.mean_squared_error(outputs_train['F_t'], identity, is_mean = True, name = 'loss_identity_t')
-            self.loss['stable'] = self.masked_MSE(outputs_train['s_t_pred'], self.inputs['s_t_gt'], outputs_train['s_t_pred_mask'], 'loss_stable')
-            self.loss['temporal'] = self.temporal_loss(outputs_train['s_t_pred_warped'], outputs_train['s_t_1_pred'], outputs_train['s_t_pred_warped_mask'], outputs_train['s_t_1_pred_mask'], self.inputs['of_t'], self.h, self.w, 'loss_temporal')
-            self.loss['surf'] = self.get_surf_loss(self.inputs['surfs_t'], outputs_train['F_t'], self.inputs['surfs_dim_t'], batch_size)
+            self.loss['image'] = self.masked_MSE(outputs_train['s_t_1_pred'], self.inputs['s_t_1_gt'], outputs_train['s_t_1_pred_mask'], 'loss_image_t_1')\
+                               + self.masked_MSE(outputs_train['s_t_pred'], self.inputs['s_t_gt'], outputs_train['s_t_pred_mask'], 'loss_image_t')
+            # self.loss['image'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs['s_t_1_gt'], is_mean = True, name = 'loss_image_t_1')\
+            #                     + tl.cost.mean_squared_error(outputs_train['s_t_pred'], self.inputs['s_t_gt'], is_mean = True, name = 'loss_image_t')
+            self.loss['identity'] = tl.cost.absolute_difference_error(outputs_train['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
+                                    + tl.cost.absolute_difference_error(outputs_train['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+            self.loss['temporal'] = self.temporal_loss(outputs_train['s_t_pred'], outputs_train['s_t_1_pred'], outputs_train['s_t_pred_mask'], outputs_train['s_t_1_pred_mask'], self.inputs['of_t'], self.h, self.w, 'loss_temporal')
+            self.loss['surf'] = self.get_surf_loss(self.inputs['surfs_t_1'], outputs_train['x_offset_t_1'], outputs_train['y_offset_t_1'], self.inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
+                              + self.get_surf_loss(self.inputs['surfs_t'], outputs_train['x_offset_t'], outputs_train['y_offset_t'], self.inputs['surfs_dim_t'], batch_size, self.w, self.h)
 
             self.loss = self.gather_only_applied_loss(self.loss, self.loss_applied)
             self.loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.loss.items()], name = 'loss_total')
@@ -103,11 +115,16 @@ class Trainer:
 
         self.loss_test = collections.OrderedDict()
 
-        with tf.name_scope('loss'):
-            #self.loss_test['identity'] = tl.cost.mean_squared_error(outputs_test['F_t'], identity, is_mean = True, name = 'loss_identity_t')
-            self.loss_test['stable'] = self.masked_MSE(outputs_test['s_t_pred'], self.inputs['s_t_gt'], outputs_test['s_t_pred_mask'], 'loss_stable')
-            self.loss_test['temporal'] = self.temporal_loss(outputs_test['s_t_pred_warped'], outputs_test['s_t_1_pred'], outputs_test['s_t_pred_warped_mask'], outputs_test['s_t_1_pred_mask'], self.inputs['of_t'], self.h, self.w, 'loss_temporal')
-            self.loss_test['surf'] = self.get_surf_loss(self.inputs['surfs_t'], outputs_test['F_t'], self.inputs['surfs_dim_t'], batch_size)
+        with tf.name_scope('loss_test'):
+            self.loss_test['image'] = self.masked_MSE(outputs_test['s_t_1_pred'], self.inputs['s_t_1_gt'], outputs_test['s_t_1_pred_mask'], 'loss_image_t_1')\
+                               + self.masked_MSE(outputs_test['s_t_pred'], self.inputs['s_t_gt'], outputs_test['s_t_pred_mask'], 'loss_image_t')
+            # self.loss_test['image'] = tl.cost.mean_squared_error(outputs_test['s_t_1_pred'], self.inputs['s_t_1_gt'], is_mean = True, name = 'loss_image_t_1')\
+            #                     + tl.cost.mean_squared_error(outputs_test['s_t_pred'], self.inputs['s_t_gt'], is_mean = True, name = 'loss_image_t')
+            self.loss_test['identity'] = tl.cost.absolute_difference_error(outputs_test['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
+                                    + tl.cost.absolute_difference_error(outputs_test['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+            self.loss_test['temporal'] = self.temporal_loss(outputs_test['s_t_pred'], outputs_test['s_t_1_pred'], outputs_test['s_t_pred_mask'], outputs_test['s_t_1_pred_mask'], self.inputs['of_t'], self.h, self.w, 'loss_temporal')
+            self.loss_test['surf'] = self.get_surf_loss(self.inputs['surfs_t_1'], outputs_test['x_offset_t_1'], outputs_test['y_offset_t_1'], self.inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
+                              + self.get_surf_loss(self.inputs['surfs_t'], outputs_test['x_offset_t'], outputs_test['y_offset_t'], self.inputs['surfs_dim_t'], batch_size, self.w, self.h)
 
             self.loss_test = self.gather_only_applied_loss(self.loss_test, self.loss_applied)
             self.loss_test['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.loss_test.items()], name = 'loss_total')
@@ -179,15 +196,15 @@ class Trainer:
         image_sum_list.append(tf.summary.image('1_u_t', fix_image_tf(self.inputs['u_t'], 1)))
         image_sum_list.append(tf.summary.image('2_s_t_pred', fix_image_tf(self.outputs_train['s_t_pred'], 1)))
         image_sum_list.append(tf.summary.image('3_s_t_gt', fix_image_tf(self.inputs['s_t_gt'], 1)))
-        image_sum_list.append(tf.summary.image('4_s_t_prev', fix_image_tf(self.outputs_train['patches_masked'][:, :, :, 3 * (2 * self.sample_num - 3) : 3 * (2 * self.sample_num - 2)], 1)))
+        image_sum_list.append(tf.summary.image('4_s_t_pred_mask', fix_image_tf(self.outputs_train['s_t_pred_mask'], 1)))
 
-        image_sum_list.append(tf.summary.image('5_s_t_1', fix_image_tf(self.outputs_train['s_t_1'], 1)))
-        image_sum_list.append(tf.summary.image('6_s_t_1_prev', fix_image_tf(self.outputs_train['patches_masked'][:, :, :, 3 * (2 * self.sample_num - 4) : 3 * (2 * self.sample_num - 3)], 1)))
+        image_sum_list.append(tf.summary.image('5_u_t_1', fix_image_tf(self.inputs['u_t_1'], 1)))
+        image_sum_list.append(tf.summary.image('6_s_t_1_pred', fix_image_tf(self.outputs_train['s_t_1_pred'], 1)))
+        image_sum_list.append(tf.summary.image('7_s_t_1_gt', fix_image_tf(self.inputs['s_t_1_gt'], 1)))
+        image_sum_list.append(tf.summary.image('8_s_t_1_pred_mask', fix_image_tf(self.outputs_train['s_t_1_pred_mask'], 1)))
 
-        image_sum_list.append(tf.summary.image('7_s_t_pred_mask', fix_image_tf(self.outputs_train['s_t_pred_mask'], 1)))
-        image_sum_list.append(tf.summary.image('8_s_t_gt_warped', fix_image_tf(self.outputs_train['s_t_gt_warped'], 1)))
-        image_sum_list.append(tf.summary.image('9_s_t_1', fix_image_tf(self.outputs_train['s_t_1'], 1)))
-        image_sum_list.append(tf.summary.image('10_s_t_1_mask', fix_image_tf(self.outputs_train['s_t_1_mask'], 1)))
+        image_sum_list.append(tf.summary.image('9_s_t_pred_warped', fix_image_tf(self.outputs_train['s_t_pred_warped'], 1)))
+        image_sum_list.append(tf.summary.image('10_s_t_pred_warped_mask', fix_image_tf(self.outputs_train['s_t_pred_warped_mask'], 1)))
         image_sum = tf.summary.merge(image_sum_list)
 
         with tf.name_scope('loss_epoch'):
@@ -331,26 +348,27 @@ class Trainer:
 
         return feed_dict
 
-    def get_surf_loss(self, surf, H_flat, max_dim_per_batch, batch_size):
-        stab_ind = 1
-        unstab_ind = 0
+    def get_surf_loss(self, surf, x_offset, y_offset, max_dim_per_batch, batch_size, w, h):
+        x_offset = tf.concat([tf.reshape(x_offset, [batch_size, -1]), tf.ones([batch_size, 1]) * -1], axis = 1)
+        y_offset = tf.concat([tf.reshape(y_offset, [batch_size, -1]), tf.ones([batch_size, 1]) * -1], axis = 1)
 
-        H = tf.reshape(tf.concat([H_flat, tf.ones([batch_size, 1])], axis = 1), [-1, 3, 3])
+        # stab
+        unstab_surf = tf.cast(surf[:, 0, :, :], 'float32')
+        unstab_surf_x_norm = tf.expand_dims((unstab_surf[:, :, 0] / (w - 1)) * 2 - 1, axis = 2)
+        unstab_surf_y_norm = tf.expand_dims((unstab_surf[:, :, 1] / (h - 1)) * 2 - 1, axis = 2)
+        unstab_surf_norm = tf.concat([unstab_surf_x_norm, unstab_surf_y_norm], axis = 2)
 
-        surf_dim = tf.shape(surf)[2]
-        surf_stab = tf.transpose(tf.concat([surf[:,stab_ind,:,:],tf.ones([batch_size, surf_dim, 1])], 2), [0, 2, 1])
+        # unstab
+        stab_surf = surf[:, 1, :, :]
+        stab_surf_x = tf.cast(stab_surf[:, :, 0], 'float32')
+        stab_surf_y = tf.cast(stab_surf[:, :, 1], 'float32')
+        idx = tf.cast(stab_surf_x + stab_surf_y * w, 'int32')
 
-        index_stab = tf.matmul(H, surf_stab)
-        z = index_stab[:, 2, :]
-        index_stab = tf.concat([tf.expand_dims(tf.div_no_nan(index_stab[:, 0, :], z), 2), tf.expand_dims(tf.div_no_nan(index_stab[:, 1,:], z),2)],2)
+        stab_surf_transformed_x_norm = tf.expand_dims(tf.batch_gather(x_offset, idx), axis = 2)
+        stab_surf_transformed_y_norm = tf.expand_dims(tf.batch_gather(y_offset, idx), axis = 2)
+        stab_surf_transformed_norm = tf.concat([stab_surf_transformed_x_norm, stab_surf_transformed_y_norm], axis = 2)
 
-        index_stab = index_stab
-        index_unstab = surf[:, unstab_ind, :, :]
-
-        # norm_param = tf.constant([w, h], shape = [1, 2], dtype = tf.float32)
-        MSE = tf.reduce_sum(tf.squared_difference(index_stab, index_unstab), axis = [1, 2])
-        #MSE = tf.reduce_sum(tf.abs(index_stab - index_unstab), axis = [1, 2])
-        MSE = tf.div_no_nan(MSE, max_dim_per_batch * 2)
+        MSE = tf.reduce_sum(tf.squared_difference(stab_surf_transformed_norm, unstab_surf_norm), axis = [1, 2])
+        MSE = tf.div_no_nan(MSE, max_dim_per_batch)
 
         return tf.reduce_mean(MSE)
-
