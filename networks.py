@@ -15,7 +15,7 @@ def scale_RGB(rgb):
 
     return bgr
 
-def localizationNet(input, is_train = False, reuse = False, scope = 'resnet_v1_50'):
+def localizationNet(input, param_dim, is_train = False, reuse = False, scope = 'resnet_v1_50'):
     lrelu = lambda x: tf.nn.leaky_relu(x, 0.2)
     with tf.variable_scope(scope, reuse = reuse):
         with slim.arg_scope(resnet_v1.resnet_arg_scope()):
@@ -29,6 +29,6 @@ def localizationNet(input, is_train = False, reuse = False, scope = 'resnet_v1_5
         net = tl.layers.DenseLayer(net, n_units = 50, act = tf.identity, name='df/dense4')
 
         thetas_affine = net.outputs
-        thetas_affine = tf.reshape(thetas_affine, [-1, 25, 2])
+        thetas_affine = tf.reshape(thetas_affine, [-1, param_dim, 2])
 
     return thetas_affine

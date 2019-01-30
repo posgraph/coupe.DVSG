@@ -16,12 +16,8 @@ class StabNet:
         self.h = h
         self.w = w
         self.c = 3
-        self.s_ = np.array([ # source position
-          [-1, -1],[-0.5, -1],[0, -1],[0.5, -1],[1, -1],
-          [-1, -0.5],[-0.5, -0.5],[0, -0.5],[0.5, -0.5],[1, -0.5],
-          [-1, 0],[-0.5, 0],[0, 0],[0.5, 0],[1, 0],
-          [-1, 0.5],[-0.5, 0.5],[0, 0.5],[0.5, 0.5],[1, 0.5],
-          [-1, 1],[-0.5, 1],[0, 1],[0.5, 1],[1, 1]])
+        self.num_control_points = 5
+        self.param_dim = self.num_control_points ** 2
 
         self.reuse = collections.OrderedDict()
 
@@ -55,26 +51,33 @@ class StabNet:
             self.inputs['surfs_dim_t_1'] = tf.placeholder('float32', [None], name = 'surfs_dim_t_1')
             self.inputs['surfs_dim_t'] = tf.placeholder('float32', [None], name = 'surfs_dim_t')
 
+            self.inputs['V_src'] = np.array([ # source position
+              [-1, -1],[-0.5, -1],[0, -1],[0.5, -1],[1, -1],
+              [-1, -0.5],[-0.5, -0.5],[0, -0.5],[0.5, -0.5],[1, -0.5],
+              [-1, 0],[-0.5, 0],[0, 0],[0.5, 0],[1, 0],
+              [-1, 0.5],[-0.5, 0.5],[0, 0.5],[0.5, 0.5],[1, 0.5],
+              [-1, 1],[-0.5, 1],[0, 1],[0.5, 1],[1, 1]])
+            self.inputs['V_src'] = tf.tile(tf.constant(self.inputs['V_src'].reshape([1, self.param_dim, 2]), dtype=tf.float32), [tf.shape(self.inputs['u_t_1'])[0], 1, 1])
+            self.inputs['num_control_points'] = self.num_control_points
+
         return self.inputs
 
     def get_train_model(self, is_train):
         outputs = collections.OrderedDict()
         outputs['patches_masked_t_1'], outputs['random_masks_t_1'] = self.random_mask(self.inputs['patches_t_1'], [self.h, self.w], self.sample_num)
         outputs['patches_masked_t'], outputs['random_masks_t'] = self.random_mask(self.inputs['patches_t'], [self.h, self.w], self.sample_num)
-
-        self.s = tf.tile(tf.constant(self.s_.reshape([1, 25, 2]), dtype=tf.float32), [tf.shape(self.inputs['u_t_1'])[0], 1, 1])
     
         with tf.variable_scope('stabNet') as scope:
             ## Regressor
-            outputs['F_t_1'] = localizationNet(outputs['patches_masked_t_1'], is_train, self.get_reuse('stabNet'), scope = scope)
-            outputs['F_t'] = localizationNet(outputs['patches_masked_t'], is_train, self.get_reuse('stabNet'), scope = scope)
+            outputs['F_t_1'] = localizationNet(outputs['patches_masked_t_1'], self.param_dim, is_train, self.get_reuse('stabNet'), scope = scope)
+            outputs['F_t'] = localizationNet(outputs['patches_masked_t'], self.param_dim, is_train, self.get_reuse('stabNet'), scope = scope)
 
             ## STN
-            outputs['s_t_1_pred'], outputs['x_offset_t_1'], outputs['y_offset_t_1'] = stn(self.inputs['u_t_1'], self.s, outputs['F_t_1'], [self.h, self.w])
-            outputs['s_t_1_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t_1']), self.s, outputs['F_t_1'], [self.h, self.w])
+            outputs['s_t_1_pred'], outputs['x_offset_t_1'], outputs['y_offset_t_1'] = stn(self.inputs['u_t_1'], self.inputs['V_src'], outputs['F_t_1'], [self.h, self.w])
+            outputs['s_t_1_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t_1']), self.inputs['V_src'], outputs['F_t_1'], [self.h, self.w])
 
-            outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(self.inputs['u_t'], self.s, outputs['F_t'], [self.h, self.w])
-            outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t']), self.s, outputs['F_t'], [self.h, self.w])
+            outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(self.inputs['u_t'], self.inputs['V_src'], outputs['F_t'], [self.h, self.w])
+            outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t']), self.inputs['V_src'], outputs['F_t'], [self.h, self.w])
 
         return outputs
 

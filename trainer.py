@@ -95,18 +95,26 @@ class Trainer:
         identity = tf.zeros([batch_size, 25, 2])
         with tf.name_scope('loss'):
             loss['image'] = self.masked_MSE(outputs['s_t_1_pred'], inputs['s_t_1_gt'], outputs['s_t_1_pred_mask'], 'loss_image_t_1')\
-                               + self.masked_MSE(outputs['s_t_pred'], inputs['s_t_gt'], outputs['s_t_pred_mask'], 'loss_image_t')
+                          + self.masked_MSE(outputs['s_t_pred'], inputs['s_t_gt'], outputs['s_t_pred_mask'], 'loss_image_t')
             # loss['image'] = tl.cost.mean_squared_error(outputs['s_t_1_pred'], inputs['s_t_1_gt'], is_mean = True, name = 'loss_image_t_1')\
             #                     + tl.cost.mean_squared_error(outputs['s_t_pred'], inputs['s_t_gt'], is_mean = True, name = 'loss_image_t')
+
             loss['identity'] = tl.cost.absolute_difference_error(outputs['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
-                                    + tl.cost.absolute_difference_error(outputs['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+                             + tl.cost.absolute_difference_error(outputs['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+
             loss['temporal'] = self.temporal_loss(outputs['s_t_pred'], outputs['s_t_1_pred'], outputs['s_t_pred_mask'], outputs['s_t_1_pred_mask'], inputs['of_t'], self.h, self.w, 'loss_temporal')
+
             loss['surf'] = self.get_surf_loss(inputs['surfs_t_1'], outputs['x_offset_t_1'], outputs['y_offset_t_1'], inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
-                              + self.get_surf_loss(inputs['surfs_t'], outputs['x_offset_t'], outputs['y_offset_t'], inputs['surfs_dim_t'], batch_size, self.w, self.h)
+                         + self.get_surf_loss(inputs['surfs_t'], outputs['x_offset_t'], outputs['y_offset_t'], inputs['surfs_dim_t'], batch_size, self.w, self.h)
+
+            loss['distortion'] = self.distoration_loss(inputs['V_src'], outptus['F_t_1'], inputs['num_control_points'], name = 'loss_distortion_t_1')\
+                               + self.distoration_loss(inputs['V_src'], outptus['F_t'], inputs['num_control_points'], name = 'loss_distortion_t')
 
             loss = self.gather_only_applied_loss(loss, loss_applied)
             loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in loss.items()], name = 'loss_total')
             print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in loss.items()]))))
+
+            return loss
 
     def build_pretrain_optim(self, config):
         with tf.name_scope('Optimizer'):
@@ -187,7 +195,6 @@ class Trainer:
         image_sum_list.append(tf.summary.image('11_u_t_1_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 18:21], 1)))
         image_sum_list.append(tf.summary.image('12_s_prev_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 15:18], 1)))
 
-
         image_sum = tf.summary.merge(image_sum_list)
 
         with tf.name_scope('loss_epoch'):
@@ -229,7 +236,7 @@ class Trainer:
         #return tl.cost.mean_squared_error(s_t_pred_warped, s_t_1_pred, is_mean = True)
         return self.masked_MSE(pred_warped, gt, mask_pred_warped * mask_gt, name)
 
-    def shape_preserving_loss(self, x, y, name):
+    def distoration_loss(self, V_src, V, num_control_points, name):
         def get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size):
             s = tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.pow((v_src - v_src_1), 2), axis = 3))/tf.sqrt(tf.reduce_sum(tf.pow((v_src_0 - v_src_1), 2), axis = 3)), axis = 3)
             M_rot = tf.reshape(tf.tile([0., 1., -1., 0.], [batch_size]), [batch_size, 2, 2]) # [b, 2, 2]
@@ -246,10 +253,13 @@ class Trainer:
             sp_term = tf.reduce_sum(tf.reduce_mean(tf.reduce_sum(tf.pow(v - v_1 - s * R_v_0_1, 2), axis = 3), axis = [1, 2]), name = name)
             return sp_term
 
-        V = self.network.elastic_transformer.get_abs_theta(grid_points)
+        V_src = tf.reshape(V_src, [-1, num_control_points, num_control_points, 2])
+        V = tf.reshape(V, [-1, num_control_points, num_control_points, 2])
+
+        V = (V_src + V) / 2.0
         shape = tf.shape(V)
         batch_size = shape[0]
-        V_src = self.network.elastic_transformer.get_abs_src_points(batch_size)
+        V_src = (V_src + 1) / 2.0
 
         v = V[:, :-1, :-1, :]
         v_0 = tf.stop_gradient(V[:, 1:, 1:, :])
