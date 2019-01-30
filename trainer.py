@@ -108,6 +108,8 @@ class Trainer:
             loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in loss.items()], name = 'loss_total')
             print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in loss.items()]))))
 
+            return loss
+
     def build_pretrain_optim(self, config):
         with tf.name_scope('Optimizer'):
             self.learning_rate = tf.Variable(config.lr_init, trainable = False)
