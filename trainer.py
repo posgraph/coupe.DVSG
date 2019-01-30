@@ -204,9 +204,12 @@ class Trainer:
         image_sum_list.append(tf.summary.image('7_s_t_1_gt', fix_image_tf(self.inputs['s_t_1_gt'], 1)))
         image_sum_list.append(tf.summary.image('8_s_t_1_pred_mask', fix_image_tf(self.outputs_train['s_t_1_pred_mask'], 1)))
 
-        image_sum_list.append(tf.summary.image('9_s_t_gt_warped', fix_image_tf(self.outputs_train['s_t_gt_warped'], 1)))
-        image_sum_list.append(tf.summary.image('10_s_t_pred_warped', fix_image_tf(self.outputs_train['s_t_pred_warped'], 1)))
-        image_sum_list.append(tf.summary.image('11_s_t_pred_warped_mask', fix_image_tf(self.outputs_train['s_t_pred_warped_mask'], 1)))
+        image_sum_list.append(tf.summary.image('9_u_t_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 18:21], 1)))
+        image_sum_list.append(tf.summary.image('10_s_prev_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 15:18], 1)))
+        image_sum_list.append(tf.summary.image('11_u_t_1_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 18:21], 1)))
+        image_sum_list.append(tf.summary.image('12_s_prev_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 15:18], 1)))
+
+
         image_sum = tf.summary.merge(image_sum_list)
 
         with tf.name_scope('loss_epoch'):
@@ -248,7 +251,7 @@ class Trainer:
         #return tl.cost.mean_squared_error(s_t_pred_warped, s_t_1_pred, is_mean = True)
         return self.masked_MSE(pred_warped, gt, mask_pred_warped * mask_gt, name)
 
-    def shape_preserving_loss(self, grid_points, name):
+    def shape_preserving_loss(self, x, y, name):
         def get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size):
             s = tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.pow((v_src - v_src_1), 2), axis = 3))/tf.sqrt(tf.reduce_sum(tf.pow((v_src_0 - v_src_1), 2), axis = 3)), axis = 3)
             M_rot = tf.reshape(tf.tile([0., 1., -1., 0.], [batch_size]), [batch_size, 2, 2]) # [b, 2, 2]

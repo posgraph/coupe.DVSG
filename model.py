@@ -75,10 +75,6 @@ class StabNet:
 
             outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(self.inputs['u_t'], self.s, outputs['F_t'], [self.h, self.w])
             outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t']), self.s, outputs['F_t'], [self.h, self.w])
-            outputs['s_t_pred_warped'] = tf_warp(outputs['s_t_pred'], self.inputs['of_t'], self.h, self.w)
-            outputs['s_t_pred_warped_mask'] = tf_warp(outputs['s_t_pred_mask'], self.inputs['of_t'], self.h, self.w)
-
-            outputs['s_t_gt_warped'] = tf_warp(self.inputs['s_t_gt'], self.inputs['of_t'], self.h, self.w)
 
         return outputs
 
@@ -120,14 +116,16 @@ class StabNet:
     def random_mask(self, patches, out_size, sample_num):
         mask_affine = ProjectiveTransformer(out_size)
         batch_size = tf.shape(patches)[0]
-        mask = tf.ones_like(patches)
+
+        mask = tf.ones_like(patches[:, :, :, : 3 * (sample_num - 1)])
         H = tf.random_uniform([batch_size, 8], minval = -1, maxval = 1)
         H = H * tf.constant([0.1, 0.1, 0.5, 0.1, 0.1, 0.5, 0.1, 0.1])
         H = H + tf.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
         mask = mask_affine.transform(mask, H)
+        mask = tf.concat([mask, tf.ones_like(patches[:, :, :, :3])], axis = 3)
 
         return patches * mask, mask
-
+        
     def get_reuse(self, scope):
         if scope in list(self.reuse.keys()):
             self.reuse[scope] = True if self.reuse[scope] is False else True
