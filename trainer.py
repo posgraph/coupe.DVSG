@@ -28,7 +28,8 @@ class Trainer:
             self.pretraining_save_vars = self.network.get_save_vars_pretrain()
 
             print(toGreen('Initializing losses...'))
-            self.build_loss_pretrain(self.outputs_pretrain, self.outputs_pretrain_test)
+            self.pretrain_loss = self.build_loss_pretrain(self.inputs_pretrain, self.outputs_pretrain)
+            self.pretrain_loss_test = self.build_loss_pretrain(self.inputs_pretrain, self.outputs_pretrain_test)
 
             print(toGreen('Initializing optim...'))
             self.build_pretrain_optim(config)
@@ -56,7 +57,8 @@ class Trainer:
         self.training_vars = self.network.get_vars_train()
         self.save_vars = self.network.get_save_vars_train()
         print(toGreen('Initializing losses...'))
-        self.build_loss_train(self.outputs_train, self.outputs_test)
+        self.loss = self.build_loss_train(self.inputs, self.outputs_train)
+        self.loss_test = self.build_loss_train(self.inputs, self.outputs_test)
 
         print(toGreen('Initializing optim...'))
         self.build_train_optim(config)
@@ -72,62 +74,39 @@ class Trainer:
         for var in self.training_vars:
             print(var.name)
 
-    def build_loss_pretrain(self, outputs_train, outputs_test):
-        self.pretrain_loss = collections.OrderedDict()
-        batch_size = tf.shape(outputs_train['F_t'])[0]
+    def build_loss_pretrain(self, inputs, outputs):
+        pretrain_loss = collections.OrderedDict()
+        batch_size = tf.shape(outputs['F_t'])[0]
         identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
         with tf.name_scope('pretrain_loss'):
-            self.pretrain_loss['identity_image'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
-                                            + tl.cost.mean_squared_error(outputs_train['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_image_t')
-            self.pretrain_loss['identity_param'] = tl.cost.mean_squared_error(outputs_train['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
-                                            + tl.cost.mean_squared_error(outputs_train['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
-            self.pretrain_loss = self.gather_only_applied_loss(self.pretrain_loss, self.loss_applied)
-            self.pretrain_loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.pretrain_loss.items()], name = 'loss_total')
-            print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in self.pretrain_loss.items()]))))
+            pretrain_loss['identity_image'] = tl.cost.mean_squared_error(outputs['s_t_1_pred'], inputs['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
+                                            + tl.cost.mean_squared_error(outputs['s_t_pred'], inputs['u_t'], is_mean = True, name = 'loss_identity_image_t')
+            pretrain_loss['identity_param'] = tl.cost.mean_squared_error(outputs['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
+                                            + tl.cost.mean_squared_error(outputs['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+            pretrain_loss = self.gather_only_applied_loss(pretrain_loss, self.loss_applied)
+            pretrain_loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in pretrain_loss.items()], name = 'loss_total')
+            print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in pretrain_loss.items()]))))
 
-        self.pretrain_loss_test = collections.OrderedDict()
-        with tf.name_scope('pretrain_loss_test'):
-            self.pretrain_loss_test['identity_image'] = tl.cost.mean_squared_error(outputs_test['s_t_1_pred'], self.inputs_pretrain['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
-                                            + tl.cost.mean_squared_error(outputs_test['s_t_pred'], self.inputs_pretrain['u_t'], is_mean = True, name = 'loss_identity_image_t')
-            self.pretrain_loss_test['identity_param'] = tl.cost.mean_squared_error(outputs_test['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
-                                            + tl.cost.mean_squared_error(outputs_test['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
-            self.pretrain_loss_test = self.gather_only_applied_loss(self.pretrain_loss_test, self.loss_applied)
-            self.pretrain_loss_test['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.pretrain_loss_test.items()], name = 'loss_total')
+        return pretrain_loss
 
-    def build_loss_train(self, outputs_train, outputs_test):
+    def build_loss_train(self, inputs, outputs):
         batch_size = tf.shape(outputs_train['F_t'])[0]
-        self.loss = collections.OrderedDict()
+        loss = collections.OrderedDict()
         identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
         with tf.name_scope('loss'):
-            self.loss['image'] = self.masked_MSE(outputs_train['s_t_1_pred'], self.inputs['s_t_1_gt'], outputs_train['s_t_1_pred_mask'], 'loss_image_t_1')\
-                               + self.masked_MSE(outputs_train['s_t_pred'], self.inputs['s_t_gt'], outputs_train['s_t_pred_mask'], 'loss_image_t')
-            # self.loss['image'] = tl.cost.mean_squared_error(outputs_train['s_t_1_pred'], self.inputs['s_t_1_gt'], is_mean = True, name = 'loss_image_t_1')\
-            #                     + tl.cost.mean_squared_error(outputs_train['s_t_pred'], self.inputs['s_t_gt'], is_mean = True, name = 'loss_image_t')
-            self.loss['identity'] = tl.cost.absolute_difference_error(outputs_train['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
-                                    + tl.cost.absolute_difference_error(outputs_train['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
-            self.loss['temporal'] = self.temporal_loss(outputs_train['s_t_pred'], outputs_train['s_t_1_pred'], outputs_train['s_t_pred_mask'], outputs_train['s_t_1_pred_mask'], self.inputs['of_t'], self.h, self.w, 'loss_temporal')
-            self.loss['surf'] = self.get_surf_loss(self.inputs['surfs_t_1'], outputs_train['x_offset_t_1'], outputs_train['y_offset_t_1'], self.inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
-                              + self.get_surf_loss(self.inputs['surfs_t'], outputs_train['x_offset_t'], outputs_train['y_offset_t'], self.inputs['surfs_dim_t'], batch_size, self.w, self.h)
+            loss['image'] = self.masked_MSE(outputs['s_t_1_pred'], inputs['s_t_1_gt'], outputs['s_t_1_pred_mask'], 'loss_image_t_1')\
+                               + self.masked_MSE(outputs['s_t_pred'], inputs['s_t_gt'], outputs['s_t_pred_mask'], 'loss_image_t')
+            # loss['image'] = tl.cost.mean_squared_error(outputs['s_t_1_pred'], inputs['s_t_1_gt'], is_mean = True, name = 'loss_image_t_1')\
+            #                     + tl.cost.mean_squared_error(outputs['s_t_pred'], inputs['s_t_gt'], is_mean = True, name = 'loss_image_t')
+            loss['identity'] = tl.cost.absolute_difference_error(outputs['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
+                                    + tl.cost.absolute_difference_error(outputs['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+            loss['temporal'] = self.temporal_loss(outputs['s_t_pred'], outputs['s_t_1_pred'], outputs['s_t_pred_mask'], outputs['s_t_1_pred_mask'], inputs['of_t'], self.h, self.w, 'loss_temporal')
+            loss['surf'] = self.get_surf_loss(inputs['surfs_t_1'], outputs['x_offset_t_1'], outputs['y_offset_t_1'], inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
+                              + self.get_surf_loss(inputs['surfs_t'], outputs['x_offset_t'], outputs['y_offset_t'], inputs['surfs_dim_t'], batch_size, self.w, self.h)
 
-            self.loss = self.gather_only_applied_loss(self.loss, self.loss_applied)
-            self.loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.loss.items()], name = 'loss_total')
-            print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in self.loss.items()]))))
-
-        self.loss_test = collections.OrderedDict()
-
-        with tf.name_scope('loss_test'):
-            self.loss_test['image'] = self.masked_MSE(outputs_test['s_t_1_pred'], self.inputs['s_t_1_gt'], outputs_test['s_t_1_pred_mask'], 'loss_image_t_1')\
-                               + self.masked_MSE(outputs_test['s_t_pred'], self.inputs['s_t_gt'], outputs_test['s_t_pred_mask'], 'loss_image_t')
-            # self.loss_test['image'] = tl.cost.mean_squared_error(outputs_test['s_t_1_pred'], self.inputs['s_t_1_gt'], is_mean = True, name = 'loss_image_t_1')\
-            #                     + tl.cost.mean_squared_error(outputs_test['s_t_pred'], self.inputs['s_t_gt'], is_mean = True, name = 'loss_image_t')
-            self.loss_test['identity'] = tl.cost.absolute_difference_error(outputs_test['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
-                                    + tl.cost.absolute_difference_error(outputs_test['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
-            self.loss_test['temporal'] = self.temporal_loss(outputs_test['s_t_pred'], outputs_test['s_t_1_pred'], outputs_test['s_t_pred_mask'], outputs_test['s_t_1_pred_mask'], self.inputs['of_t'], self.h, self.w, 'loss_temporal')
-            self.loss_test['surf'] = self.get_surf_loss(self.inputs['surfs_t_1'], outputs_test['x_offset_t_1'], outputs_test['y_offset_t_1'], self.inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
-                              + self.get_surf_loss(self.inputs['surfs_t'], outputs_test['x_offset_t'], outputs_test['y_offset_t'], self.inputs['surfs_dim_t'], batch_size, self.w, self.h)
-
-            self.loss_test = self.gather_only_applied_loss(self.loss_test, self.loss_applied)
-            self.loss_test['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in self.loss_test.items()], name = 'loss_total')
+            loss = self.gather_only_applied_loss(loss, loss_applied)
+            loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in loss.items()], name = 'loss_total')
+            print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in loss.items()]))))
 
     def build_pretrain_optim(self, config):
         with tf.name_scope('Optimizer'):
