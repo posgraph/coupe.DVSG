@@ -90,7 +90,7 @@ class Trainer:
         return pretrain_loss
 
     def build_loss_train(self, inputs, outputs):
-        batch_size = tf.shape(outputs_train['F_t'])[0]
+        batch_size = tf.shape(outputs['F_t'])[0]
         loss = collections.OrderedDict()
         identity = tf.zeros([batch_size, self.network.elastic_transformer.param_dim])
         with tf.name_scope('loss'):
@@ -107,6 +107,8 @@ class Trainer:
             loss = self.gather_only_applied_loss(loss, loss_applied)
             loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in loss.items()], name = 'loss_total')
             print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in loss.items()]))))
+
+            return loss
 
     def build_pretrain_optim(self, config):
         with tf.name_scope('Optimizer'):
