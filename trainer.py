@@ -9,7 +9,7 @@ from warp_with_optical_flow import *
 
 class Trainer:
     def __init__(self, network, data_loaders, config):
-        print(toGreen('Initializing network...'))
+        print(toGreen('Building network...'))
         self.network = network
         self.h = config.height
         self.w = config.width
@@ -18,7 +18,7 @@ class Trainer:
             print(toRed('[PRETRAIN MODEL]'))
             self.sample_num = config.PRETRAIN.sample_num
             self.init_loss_coefficient(config.PRETRAIN)
-            print(toGreen('Initializing model...'))
+            print(toGreen('Building model...'))
             self.inputs_pretrain = self.network.init_pretrain_inputs(self.sample_num)
             self.outputs_pretrain = self.network.get_pretrain_model(is_train = True)
             self.outputs_pretrain_test = self.network.get_pretrain_model(is_train = False)
@@ -27,11 +27,11 @@ class Trainer:
             self.pretraining_vars = self.network.get_vars_pretrain()
             self.pretraining_save_vars = self.network.get_save_vars_pretrain()
 
-            print(toGreen('Initializing losses...'))
+            print(toGreen('Building losses...'))
             self.pretrain_loss = self.build_loss_pretrain(self.inputs_pretrain, self.outputs_pretrain)
             self.pretrain_loss_test = self.build_loss_pretrain(self.inputs_pretrain, self.outputs_pretrain_test)
 
-            print(toGreen('Initializing optim...'))
+            print(toGreen('Building optim...'))
             self.build_pretrain_optim(config)
             self.build_pretrain_summary()
 
@@ -48,7 +48,7 @@ class Trainer:
         print(toRed('[TRAIN MODEL]'))
         self.sample_num = config.sample_num
         self.init_loss_coefficient(config)
-        print(toGreen('Initializing model...'))
+        print(toGreen('Building model...'))
         self.inputs = self.network.init_train_inputs(self.sample_num)
         self.outputs_train = self.network.get_train_model(is_train = True)
         self.outputs_test = self.network.get_train_model(is_train = False)
@@ -56,14 +56,14 @@ class Trainer:
         print(toGreen('Getting variables...'))
         self.training_vars = self.network.get_vars_train()
         self.save_vars = self.network.get_save_vars_train()
-        print(toGreen('Initializing losses...'))
+        print(toGreen('Building losses...'))
         self.loss = self.build_loss_train(self.inputs, self.outputs_train)
         self.loss_test = self.build_loss_train(self.inputs, self.outputs_test)
 
-        print(toGreen('Initializing optim...'))
+        print(toGreen('Building optim...'))
         self.build_train_optim(config)
 
-        print(toGreen('Initializing summary...'))
+        print(toGreen('Building summary...'))
         self.build_train_summary()
 
         print(toGreen('Registering dataloader to the network ...'))
@@ -74,24 +74,27 @@ class Trainer:
         for var in self.training_vars:
             print(var.name)
 
-    def build_loss_pretrain(self, outputs_train, outputs_test):
+    def build_loss_pretrain(self, inputs, outputs):
         pretrain_loss = collections.OrderedDict()
-        batch_size = tf.shape(outputs_train['F_t'])[0]
+        batch_size = tf.shape(outputs['F_t'])[0]
         identity = tf.zeros([batch_size, 25, 2])
         with tf.name_scope('pretrain_loss'):
             pretrain_loss['identity_image'] = tl.cost.mean_squared_error(outputs['s_t_1_pred'], inputs['u_t_1'], is_mean = True, name = 'loss_identity_image_t_1')\
                                             + tl.cost.mean_squared_error(outputs['s_t_pred'], inputs['u_t'], is_mean = True, name = 'loss_identity_image_t')
+
             pretrain_loss['identity_param'] = tl.cost.mean_squared_error(outputs['F_t'], identity, is_mean = True, name = 'loss_identity_param_t_1')\
                                             + tl.cost.mean_squared_error(outputs['F_t_1'], identity, is_mean = True, name = 'loss_identity_param_t')
+
             pretrain_loss = self.gather_only_applied_loss(pretrain_loss, self.loss_applied)
             pretrain_loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in pretrain_loss.items()], name = 'loss_total')
+
             print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in pretrain_loss.items()]))))
 
         return pretrain_loss
 
     def build_loss_train(self, inputs, outputs):
         loss = collections.OrderedDict()
-        batch_size = tf.shape(outputs_train['F_t'])[0]
+        batch_size = tf.shape(outputs['F_t'])[0]
         identity = tf.zeros([batch_size, 25, 2])
         with tf.name_scope('loss'):
             loss['image'] = self.masked_MSE(outputs['s_t_1_pred'], inputs['s_t_1_gt'], outputs['s_t_1_pred_mask'], 'loss_image_t_1')\
@@ -107,13 +110,16 @@ class Trainer:
             loss['surf'] = self.get_surf_loss(inputs['surfs_t_1'], outputs['x_offset_t_1'], outputs['y_offset_t_1'], inputs['surfs_dim_t_1'], batch_size, self.w, self.h)\
                          + self.get_surf_loss(inputs['surfs_t'], outputs['x_offset_t'], outputs['y_offset_t'], inputs['surfs_dim_t'], batch_size, self.w, self.h)
 
-            loss['distortion'] = self.distoration_loss(inputs['V_src'], outptus['F_t_1'], inputs['num_control_points'], name = 'loss_distortion_t_1')\
-                               + self.distoration_loss(inputs['V_src'], outptus['F_t'], inputs['num_control_points'], name = 'loss_distortion_t')
+            loss['cor'] = tl.cost.mean_squared_error(outputs['CM_t_1_pred'], outputs['CM_t_1_gt'], is_mean = True, name = 'loss_cor_t_1')\
+                        + tl.cost.mean_squared_error(outputs['CM_t_pred'], outputs['CM_t_gt'], is_mean = True, name = 'loss_cor_t')\
 
-            loss = self.gather_only_applied_loss(loss, loss_applied)
+            loss['distortion'] = self.distoration_loss(outputs['V_src'], outputs['F_t_1'], outputs['num_control_points'], name = 'loss_distortion_t_1')\
+                               + self.distoration_loss(outputs['V_src'], outputs['F_t'], outputs['num_control_points'], name = 'loss_distortion_t')
+
+            loss = self.gather_only_applied_loss(loss, self.loss_applied)
             loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in loss.items()], name = 'loss_total')
-            print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in loss.items()]))))
 
+            print(toRed('{}'.format('applied losses: {}'.format([key for (key, val) in loss.items()]))))
             return loss
 
     def build_pretrain_optim(self, config):
@@ -184,16 +190,20 @@ class Trainer:
         image_sum_list.append(tf.summary.image('2_s_t_pred', fix_image_tf(self.outputs_train['s_t_pred'], 1)))
         image_sum_list.append(tf.summary.image('3_s_t_gt', fix_image_tf(self.inputs['s_t_gt'], 1)))
         image_sum_list.append(tf.summary.image('4_s_t_pred_mask', fix_image_tf(self.outputs_train['s_t_pred_mask'], 1)))
+        image_sum_list.append(tf.summary.image('5_CM_t_pred', fix_image_tf(self.outputs_train['CM_t_pred'], 1)))
+        image_sum_list.append(tf.summary.image('6_CM_t_gt', fix_image_tf(self.outputs_train['CM_t_gt'], 1)))
 
-        image_sum_list.append(tf.summary.image('5_u_t_1', fix_image_tf(self.inputs['u_t_1'], 1)))
-        image_sum_list.append(tf.summary.image('6_s_t_1_pred', fix_image_tf(self.outputs_train['s_t_1_pred'], 1)))
-        image_sum_list.append(tf.summary.image('7_s_t_1_gt', fix_image_tf(self.inputs['s_t_1_gt'], 1)))
-        image_sum_list.append(tf.summary.image('8_s_t_1_pred_mask', fix_image_tf(self.outputs_train['s_t_1_pred_mask'], 1)))
+        image_sum_list.append(tf.summary.image('7_u_t_1', fix_image_tf(self.inputs['u_t_1'], 1)))
+        image_sum_list.append(tf.summary.image('8_s_t_1_pred', fix_image_tf(self.outputs_train['s_t_1_pred'], 1)))
+        image_sum_list.append(tf.summary.image('9_s_t_1_gt', fix_image_tf(self.inputs['s_t_1_gt'], 1)))
+        image_sum_list.append(tf.summary.image('10_s_t_1_pred_mask', fix_image_tf(self.outputs_train['s_t_1_pred_mask'], 1)))
+        image_sum_list.append(tf.summary.image('11_CM_t_1_pred', fix_image_tf(self.outputs_train['CM_t_1_pred'], 1)))
+        image_sum_list.append(tf.summary.image('12_CM_t_1_gt', fix_image_tf(self.outputs_train['CM_t_1_gt'], 1)))
 
-        image_sum_list.append(tf.summary.image('9_u_t_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 18:21], 1)))
-        image_sum_list.append(tf.summary.image('10_s_prev_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 15:18], 1)))
-        image_sum_list.append(tf.summary.image('11_u_t_1_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 18:21], 1)))
-        image_sum_list.append(tf.summary.image('12_s_prev_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 15:18], 1)))
+        image_sum_list.append(tf.summary.image('13_u_t_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 18:21], 1)))
+        image_sum_list.append(tf.summary.image('14_s_prev_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 15:18], 1)))
+        image_sum_list.append(tf.summary.image('15_u_t_1_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 18:21], 1)))
+        image_sum_list.append(tf.summary.image('16_s_prev_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 15:18], 1)))
 
         image_sum = tf.summary.merge(image_sum_list)
 
@@ -253,13 +263,11 @@ class Trainer:
             sp_term = tf.reduce_sum(tf.reduce_mean(tf.reduce_sum(tf.pow(v - v_1 - s * R_v_0_1, 2), axis = 3), axis = [1, 2]), name = name)
             return sp_term
 
-        V_src = tf.reshape(V_src, [-1, num_control_points, num_control_points, 2])
-        V = tf.reshape(V, [-1, num_control_points, num_control_points, 2])
-
-        V = (V_src + V) / 2.0
         shape = tf.shape(V)
         batch_size = shape[0]
-        V_src = (V_src + 1) / 2.0
+
+        V_src = (tf.reshape(V_src, [-1, num_control_points, num_control_points, 2]) + 1.0) / 2.0
+        V = V_src + (tf.reshape(V, [-1, num_control_points, num_control_points, 2]) + 1.0) / 2.0
 
         v = V[:, :-1, :-1, :]
         v_0 = tf.stop_gradient(V[:, 1:, 1:, :])
