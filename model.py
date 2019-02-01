@@ -126,6 +126,7 @@ class StabNet:
         variables_to_restore_correlationNet = collections.OrderedDict()
 
         is_exclude = False
+        
         for var in slim.get_model_variables():
             for exclude in exclude_scope:
                 if var.op.name.startswith(exclude):
