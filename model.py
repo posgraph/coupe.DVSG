@@ -101,7 +101,7 @@ class StabNet:
         return self.inputs, self.output
 
     def init_vars(self, sess):
-        exclude_scope = 'stabNet/resnet_v1_50/conv1'
+        exclude_scope = ['stabNet/resnet_v1_50/conv1']
         variables_to_restore = collections.OrderedDict()
         for var in slim.get_model_variables():
             if var.op.name.startswith(exclude_scope) == False:

@@ -9,7 +9,7 @@ from warp_with_optical_flow import *
 
 class Trainer:
     def __init__(self, network, data_loaders, config):
-        print(toGreen('Initializing network...'))
+        print(toGreen('Building network...'))
         self.network = network
         self.h = config.height
         self.w = config.width
@@ -18,7 +18,7 @@ class Trainer:
             print(toRed('[PRETRAIN MODEL]'))
             self.sample_num = config.PRETRAIN.sample_num
             self.init_loss_coefficient(config.PRETRAIN)
-            print(toGreen('Initializing model...'))
+            print(toGreen('Building model...'))
             self.inputs_pretrain = self.network.init_pretrain_inputs(self.sample_num)
             self.outputs_pretrain = self.network.get_pretrain_model(is_train = True)
             self.outputs_pretrain_test = self.network.get_pretrain_model(is_train = False)
@@ -27,11 +27,11 @@ class Trainer:
             self.pretraining_vars = self.network.get_vars_pretrain()
             self.pretraining_save_vars = self.network.get_save_vars_pretrain()
 
-            print(toGreen('Initializing losses...'))
+            print(toGreen('Building losses...'))
             self.pretrain_loss = self.build_loss_pretrain(self.inputs_pretrain, self.outputs_pretrain)
             self.pretrain_loss_test = self.build_loss_pretrain(self.inputs_pretrain, self.outputs_pretrain_test)
 
-            print(toGreen('Initializing optim...'))
+            print(toGreen('Building optim...'))
             self.build_pretrain_optim(config)
             self.build_pretrain_summary()
 
@@ -48,7 +48,7 @@ class Trainer:
         print(toRed('[TRAIN MODEL]'))
         self.sample_num = config.sample_num
         self.init_loss_coefficient(config)
-        print(toGreen('Initializing model...'))
+        print(toGreen('Building model...'))
         self.inputs = self.network.init_train_inputs(self.sample_num)
         self.outputs_train = self.network.get_train_model(is_train = True)
         self.outputs_test = self.network.get_train_model(is_train = False)
@@ -56,14 +56,14 @@ class Trainer:
         print(toGreen('Getting variables...'))
         self.training_vars = self.network.get_vars_train()
         self.save_vars = self.network.get_save_vars_train()
-        print(toGreen('Initializing losses...'))
+        print(toGreen('Building losses...'))
         self.loss = self.build_loss_train(self.inputs, self.outputs_train)
         self.loss_test = self.build_loss_train(self.inputs, self.outputs_test)
 
-        print(toGreen('Initializing optim...'))
+        print(toGreen('Building optim...'))
         self.build_train_optim(config)
 
-        print(toGreen('Initializing summary...'))
+        print(toGreen('Building summary...'))
         self.build_train_summary()
 
         print(toGreen('Registering dataloader to the network ...'))
