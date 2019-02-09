@@ -54,7 +54,6 @@ class StabNet:
             self.inputs['surfs_dim_t_1'] = tf.placeholder('float32', [None], name = 'surfs_dim_t_1')
             self.inputs['surfs_dim_t'] = tf.placeholder('float32', [None], name = 'surfs_dim_t')
 
-       
         return self.inputs
 
     def get_train_model(self, is_train):
@@ -71,7 +70,7 @@ class StabNet:
 
         outputs['patches_masked_t_1'], outputs['random_masks_t_1'] = self.random_mask(self.inputs['patches_t_1'], [self.h, self.w], self.sample_num)
         outputs['patches_masked_t'], outputs['random_masks_t'] = self.random_mask(self.inputs['patches_t'], [self.h, self.w], self.sample_num)
-    
+
         with tf.variable_scope('stabNet'):
             ## Regressor
             with tf.variable_scope('localizationNet') as scope:
@@ -94,30 +93,31 @@ class StabNet:
         return outputs
 
     def get_evaluation_model(self, sample_num):
-        self.sample_num = sample_num
-        with tf.variable_scope('input'):
-            ### PLACE HOlDERS ###
-            inputs = collections.OrderedDict()
-            inputs['patches'] = tf.placeholder('float32', [None, None, None, 3 * 2 * self.sample_num], name = 'input_frames_t')
-            inputs['u'] = tf.placeholder('float32', [None, None, None, 3], name = 'unstable_frame_t')
+        is_train = False
+        inputs = collections.OrderedDict()
+        inputs['patches_t'] = tf.placeholder('float32', [None, None, None, 3 * sample_num], name = 'input_frames_t')
+        inputs['u_t'] = tf.placeholder('float32', [None, None, None, 3], name = 'unstable_frame_t')
 
-            batch_size = tf.shape(inputs['u'])[0]
-            h = tf.shape(inputs['u'])[1]
-            w = tf.shape(inputs['u'])[2]
+        outputs = collections.OrderedDict()
+        outputs['V_src'] = np.array([ # source position
+          [-1, -1],[-0.5, -1],[0, -1],[0.5, -1],[1, -1],
+          [-1, -0.5],[-0.5, -0.5],[0, -0.5],[0.5, -0.5],[1, -0.5],
+          [-1, 0],[-0.5, 0],[0, 0],[0.5, 0],[1, 0],
+          [-1, 0.5],[-0.5, 0.5],[0, 0.5],[0.5, 0.5],[1, 0.5],
+          [-1, 1],[-0.5, 1],[0, 1],[0.5, 1],[1, 1]])
+        outputs['V_src'] = tf.tile(tf.constant(outputs['V_src'].reshape([1, self.param_dim, 2]), dtype=tf.float32), [tf.shape(inputs['u_t'])[0], 1, 1])
+        outputs['num_control_points'] = self.num_control_points
 
-            patches_masked, _ = self.random_mask(inputs['patches'], [h, w], self.sample_num, True)
+        with tf.variable_scope('stabNet'):
+            ## Regressor
+            with tf.variable_scope('localizationNet') as scope:
+                outputs['F_t'] = localizationNet(inputs['patches_t'], self.param_dim, is_train, self.get_reuse('localizationNet'), scope = scope)
 
-        with tf.variable_scope('main_net') as scope:
-            with tf.variable_scope('stabNet') as scope:
-                F = self.localizationNet(patches_masked, is_train = False, reuse = False, scope = scope)
+            ## STN
+            outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(inputs['u_t'], outputs['V_src'], outputs['F_t'], [self.h, self.w])
+            outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(inputs['u_t']), outputs['V_src'], outputs['F_t'], [self.h, self.w])
 
-            with tf.variable_scope('spatial_transformer') as scope:
-                stl_affine = ProjectiveTransformer([h, w])
-                s_pred = stl_affine.transform(inputs['u'], F)
-
-        self.inputs = inputs
-        self.output = s_pred
-        return self.inputs, self.output
+        return inputs, outputs
 
     def init_vars(self, sess):
         exclude_scope = ['stabNet/localizationNet/resnet_v1_50/conv1']
@@ -162,7 +162,7 @@ class StabNet:
         mask = tf.concat([mask, tf.ones_like(patches[:, :, :, :3])], axis = 3)
 
         return patches * mask, mask
-        
+
     def get_reuse(self, scope):
         if scope in list(self.reuse.keys()):
             self.reuse[scope] = True if self.reuse[scope] is False else True

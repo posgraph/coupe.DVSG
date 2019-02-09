@@ -113,8 +113,8 @@ class Trainer:
             loss['cor'] = tl.cost.mean_squared_error(outputs['CM_t_1_pred'], outputs['CM_t_1_gt'], is_mean = True, name = 'loss_cor_t_1')\
                         + tl.cost.mean_squared_error(outputs['CM_t_pred'], outputs['CM_t_gt'], is_mean = True, name = 'loss_cor_t')\
 
-            loss['distortion'] = self.distoration_loss(outputs['V_src'], outputs['F_t_1'], outputs['num_control_points'], name = 'loss_distortion_t_1')\
-                               + self.distoration_loss(outputs['V_src'], outputs['F_t'], outputs['num_control_points'], name = 'loss_distortion_t')
+            loss['distortion'] = self.distortion_loss(outputs['V_src'], outputs['F_t_1'], outputs['num_control_points'], name = 'loss_distortion_t_1')\
+                               + self.distortion_loss(outputs['V_src'], outputs['F_t'], outputs['num_control_points'], name = 'loss_distortion_t')
 
             loss = self.gather_only_applied_loss(loss, self.loss_applied)
             loss['total'] = tf.add_n([self.coef_placeholders[key] * val for (key, val) in loss.items()], name = 'loss_total')
@@ -246,7 +246,7 @@ class Trainer:
         #return tl.cost.mean_squared_error(s_t_pred_warped, s_t_1_pred, is_mean = True)
         return self.masked_MSE(pred_warped, gt, mask_pred_warped * mask_gt, name)
 
-    def distoration_loss(self, V_src, V, num_control_points, name):
+    def distortion_loss(self, V_src, V, num_control_points, name):
         def get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size):
             s = tf.expand_dims(tf.sqrt(tf.reduce_sum(tf.pow((v_src - v_src_1), 2), axis = 3))/tf.sqrt(tf.reduce_sum(tf.pow((v_src_0 - v_src_1), 2), axis = 3)), axis = 3)
             M_rot = tf.reshape(tf.tile([0., 1., -1., 0.], [batch_size]), [batch_size, 2, 2]) # [b, 2, 2]
@@ -260,18 +260,20 @@ class Trainer:
             R_v_0_1 = tf.transpose(R_v_0_1, [0, 2, 1]) # [b, 2, h*w]
             R_v_0_1 = tf.reshape(R_v_0_1, [-1, h, w, 2])
 
-            sp_term = tf.reduce_sum(tf.reduce_mean(tf.reduce_sum(tf.pow(v - v_1 - s * R_v_0_1, 2), axis = 3), axis = [1, 2]), name = name)
+            sp_term = tf.reduce_mean(tf.reduce_sum(tf.pow(v - v_1 - s * R_v_0_1, 2), axis = 3), axis = [1, 2])
             return sp_term
 
         shape = tf.shape(V)
         batch_size = shape[0]
 
         V_src = (tf.reshape(V_src, [-1, num_control_points, num_control_points, 2]) + 1.0) / 2.0
-        V = V_src + (tf.reshape(V, [-1, num_control_points, num_control_points, 2]) + 1.0) / 2.0
+        V = V_src + tf.reshape(V, [-1, num_control_points, num_control_points, 2])
 
         v = V[:, :-1, :-1, :]
-        v_0 = tf.stop_gradient(V[:, 1:, 1:, :])
-        v_1 = tf.stop_gradient(V[:, 1:, :-1, :])
+        # v_0 = tf.stop_gradient(V[:, 1:, 1:, :])
+        # v_1 = tf.stop_gradient(V[:, 1:, :-1, :])
+        v_0 = V[:, 1:, 1:, :]
+        v_1 = V[:, 1:, :-1, :]
 
         v_src = V_src[:, :-1, :-1, :]
         v_src_0 = V_src[:, 1:, 1:, :]
@@ -280,8 +282,10 @@ class Trainer:
         sp_term_1 = get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size)
 
         v = V[:, :-1, 1:, :]
-        v_0 = tf.stop_gradient(V[:, 1:, :-1, :])
-        v_1 = tf.stop_gradient(V[:, 1:, 1:, :])
+        # v_0 = tf.stop_gradient(V[:, 1:, :-1, :])
+        # v_1 = tf.stop_gradient(V[:, 1:, 1:, :])
+        v_0 = V[:, 1:, :-1, :]
+        v_1 = V[:, 1:, 1:, :]
 
         v_src = V_src[:, :-1, 1:, :]
         v_src_0 = V_src[:, 1:, :-1, :]
@@ -290,8 +294,10 @@ class Trainer:
         sp_term_2 = get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size)
 
         v = V[:, 1:, :-1, :]
-        v_0 = tf.stop_gradient(V[:, :-1, 1:, :])
-        v_1 = tf.stop_gradient(V[:, :-1, :-1, :])
+        # v_0 = tf.stop_gradient(V[:, :-1, 1:, :])
+        # v_1 = tf.stop_gradient(V[:, :-1, :-1, :])
+        v_0 = V[:, :-1, 1:, :]
+        v_1 = V[:, :-1, :-1, :]
 
         v_src = V_src[:, 1:, :-1, :]
         v_src_0 = V_src[:, :-1, 1:, :]
@@ -300,8 +306,10 @@ class Trainer:
         sp_term_3 = get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size)
 
         v = V[:, 1:, 1:, :]
-        v_0 = tf.stop_gradient(V[:, :-1, :-1, :])
-        v_1 = tf.stop_gradient(V[:, :-1, 1:, :])
+        # v_0 = tf.stop_gradient(V[:, :-1, :-1, :])
+        # v_1 = tf.stop_gradient(V[:, :-1, 1:, :])
+        v_0 = V[:, :-1, :-1, :]
+        v_1 = V[:, :-1, 1:, :]
 
         v_src = V_src[:, 1:, 1:, :]
         v_src_0 = V_src[:, :-1, :-1, :]
@@ -309,7 +317,7 @@ class Trainer:
         
         sp_term_4 = get_sp_term(v_src, v_src_0, v_src_1, v, v_0, v_1, batch_size)
 
-        return (sp_term_1 + sp_term_2 + sp_term_3 + sp_term_4) / 4.
+        return tf.reduce_mean((sp_term_1 + sp_term_2 + sp_term_3 + sp_term_4) / 4.)
 
     def gather_only_applied_loss(self, loss_dict, loss_applied):
         for key in list(loss_dict.keys()):

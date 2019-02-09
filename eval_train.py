@@ -59,7 +59,9 @@ def evaluate(config, mode):
     test_video_list = np.array(sorted(tl.files.load_file_list(path = config.unstab_path, regx = '.*', printable = False)))
     for k in np.arange(len(test_video_list)):
         test_video_name = test_video_list[k]
-        cap = cv2.VideoCapture(os.path.join(config.unstab_path, test_video_name))
+        offset = '/data1/junyonglee/video_stab/eval'
+        eval_path = os.path.join(offset, 'train')
+        cap = cv2.VideoCapture(os.path.join(eval_path, test_video_name))
         fps = cap.get(5)
         out_h = config.height
         out_w = config.width

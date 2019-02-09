@@ -42,7 +42,7 @@ def get_config(mode = ''):
     config.TRAIN.stab_path = os.path.join(offset, 'stab_similarity_frames_origin')
     config.TRAIN.unstab_path = os.path.join(offset, 'unstab_similarity_frames_origin')
     config.TRAIN.of_path = os.path.join(offset, 'optical_flow_s_stabNet')
-    config.TRAIN.surf_path = os.path.join(offset, 'surf_stabNet')
+    config.TRAIN.surf_path = os.path.join(offset, 'surf_stabNet_upgrade')
     # data options
     config.TRAIN.sample_num = 7
     config.TRAIN.skip_length = [0, 16, 24, 28, 30, 31, 32]
@@ -110,7 +110,7 @@ def get_config(mode = ''):
     config.TRAIN.TEST.stab_path = os.path.join(offset, 'stab_similarity_frames_origin')
     config.TRAIN.TEST.unstab_path = os.path.join(offset, 'unstab_similarity_frames_origin')
     config.TRAIN.TEST.of_path = os.path.join(offset, 'optical_flow_s_stabNet')
-    config.TRAIN.TEST.surf_path = os.path.join(offset, 'surf_stabNet')
+    config.TRAIN.TEST.surf_path = os.path.join(offset, 'surf_stabNet_upgrade')
     # data options
     config.TRAIN.TEST.sample_num = config.TRAIN.sample_num
     config.TRAIN.TEST.skip_length = config.TRAIN.skip_length
