@@ -146,23 +146,29 @@ class Data_Loader:
 
         surfs_t_1 = data_holder['surfs_t_1']
         surfs_t_1 = np.hstack(surfs_t_1)
-        full_surfs_t_1 = np.zeros((actual_batch, 2, max(data_holder['surfs_dim_t_1']), 2))
+        surfs_t_1_padded = np.ones((actual_batch, 2, max(data_holder['surfs_dim_t_1']), 2))
+        surfs_t_1_padded[:, 0, :, :] = surfs_t_1_padded[:, 0, :, :] * 0
+        surfs_t_1_padded[:, 1, :, 0] = surfs_t_1_padded[:, 1, :, 0] * 0
+        surfs_t_1_padded[:, 1, :, 1] = surfs_t_1_padded[:, 1, :, 1] * self.h
         mask_surfs_t_1 = np.zeros((actual_batch, 2, max(data_holder['surfs_dim_t_1']), 2))
         for i in np.arange(len(data_holder['surfs_dim_t_1'])):
             mask_surfs_t_1[i, :, 0:data_holder['surfs_dim_t_1'][i], :] = 1
-        mask_surfs_t_1 = (mask_surfs_t_1 > 0)
-        full_surfs_t_1[mask_surfs_t_1] = surfs_t_1
-        data_holder['surfs_t_1'] = full_surfs_t_1 
+        mask_surfs_t_1 = (mask_surfs_t_1 == 1)
+        surfs_t_1_padded[mask_surfs_t_1] = surfs_t_1
+        data_holder['surfs_t_1'] = surfs_t_1_padded 
 
         surfs_t = data_holder['surfs_t']
         surfs_t = np.hstack(surfs_t)
-        full_surfs_t = np.zeros((actual_batch, 2, max(data_holder['surfs_dim_t']), 2))
+        surfs_t_padded = np.ones((actual_batch, 2, max(data_holder['surfs_dim_t']), 2))
+        surfs_t_padded[:, 0, :, :] = surfs_t_padded[:, 0, :, :] * 0
+        surfs_t_padded[:, 1, :, 0] = surfs_t_padded[:, 1, :, 0] * 0
+        surfs_t_padded[:, 1, :, 1] = surfs_t_padded[:, 1, :, 1] * self.h
         mask_surfs_t = np.zeros((actual_batch, 2, max(data_holder['surfs_dim_t']), 2))
         for i in np.arange(len(data_holder['surfs_dim_t'])):
             mask_surfs_t[i, :, 0:data_holder['surfs_dim_t'][i], :] = 1
-        mask_surfs_t = (mask_surfs_t > 0)
-        full_surfs_t[mask_surfs_t] = surfs_t
-        data_holder['surfs_t'] = full_surfs_t
+        mask_surfs_t = (mask_surfs_t == 1)
+        surfs_t_padded[mask_surfs_t] = surfs_t
+        data_holder['surfs_t'] = surfs_t_padded
 
         for (key, val) in data_holder.items():
             if 'surf' not in key:
@@ -292,14 +298,14 @@ class Data_Loader:
         if len(rawdata.shape) == 2:
             output = np.zeros((2,rawdata.shape[0],2))
             for i in range(rawdata.shape[0]):
-                output[0,i,0] = rawdata[i,0]
-                output[0,i,1] = rawdata[i,1]
-                output[1,i,0] = rawdata[i,2]
-                output[1,i,1] = rawdata[i,3]
+                output[0,i,0] = int(np.round(rawdata[i,0]))
+                output[0,i,1] = int(np.round(rawdata[i,1]))
+                output[1,i,0] = int(np.round(rawdata[i,2]))
+                output[1,i,1] = int(np.round(rawdata[i,3]))
 
-            return np.expand_dims(output, axis = 0)
+            return np.expand_dims(output - 1, axis = 0)
         else:
-            return np.zeros((1, 2, 0, 2))
+            return np.ones((1, 2, 0, 2)) * self.w * self.h
 
     def _get_base_name(self, path):
         return os.path.basename(path.split('.')[0])

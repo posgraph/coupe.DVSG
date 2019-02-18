@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorlayer as tl
+import tensorflow.contrib.slim as slim
 
 import datetime
 import time
@@ -13,21 +14,54 @@ from shutil import rmtree
 import numpy as np
 
 from utils import *
-from model import StabNet
 from trainer import Trainer
 from data_loader import Data_Loader
 from ckpt_manager import CKPT_Manager
-
-import tensorflow as tf
-import tensorlayer as tl
-
-import collections
-import tensorflow.contrib.slim as slim
-
+from networks import *
 from warp_with_optical_flow import *
 from ThinPlateSpline import ThinPlateSpline as stn
 from spatial_transformer import *
-from networks import *
+
+def get_evaluation_model(sample_num, param_dim, num_control_points, h, w):
+    is_train = False
+    inputs = collections.OrderedDict()
+    inputs['patches_t'] = tf.placeholder('float32', [None, None, None, 3 * sample_num], name = 'input_frames_t')
+    inputs['u_t'] = tf.placeholder('float32', [None, None, None, 3], name = 'unstable_frame_t')
+
+    outputs = collections.OrderedDict()
+    outputs['V_src'] = np.array([ # source position
+        [-1, -1],[-0.5, -1],[0, -1],[0.5, -1],[1, -1],
+        [-1, -0.5],[-0.5, -0.5],[0, -0.5],[0.5, -0.5],[1, -0.5],
+        [-1, 0],[-0.5, 0],[0, 0],[0.5, 0],[1, 0],
+        [-1, 0.5],[-0.5, 0.5],[0, 0.5],[0.5, 0.5],[1, 0.5],
+        [-1, 1],[-0.5, 1],[0, 1],[0.5, 1],[1, 1]])
+    outputs['V_src'] = tf.tile(tf.constant(outputs['V_src'].reshape([1, param_dim, 2]), dtype=tf.float32), [tf.shape(inputs['u_t'])[0], 1, 1])
+
+
+    with tf.variable_scope('stabNet'):
+        ## Regressor
+        outputs['patches_masked_t'], outputs['random_masks_t'] = random_mask(inputs['patches_t'], [h, w], sample_num)
+        with tf.variable_scope('localizationNet') as scope:
+            outputs['F_t'] = localizationNet(outputs['patches_masked_t'], param_dim, is_train, reuse = False, scope = scope)
+
+        ## STN
+        outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(inputs['u_t'], outputs['V_src'], outputs['F_t'], [h, w])
+        outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(inputs['u_t']), outputs['V_src'], outputs['F_t'], [h, w])
+
+    return inputs, outputs
+
+def random_mask(patches, out_size, sample_num):
+    mask_affine = ProjectiveTransformer(out_size)
+    batch_size = tf.shape(patches)[0]
+
+    mask = tf.ones_like(patches[:, :, :, : 3 * (sample_num - 1)])
+    H = tf.random_uniform([batch_size, 8], minval = -1, maxval = 1)
+    H = H * tf.constant([0.1, 0.1, 0.5, 0.1, 0.1, 0.5, 0.1, 0.1])
+    H = H + tf.constant([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    mask = mask_affine.transform(mask, H)
+    mask = tf.concat([mask, tf.ones_like(patches[:, :, :, :3])], axis = 3)
+
+    return patches * mask, mask
 
 def evaluate(config, mode):
     date = datetime.datetime.now().strftime('%Y_%m_%d/%H-%M')
@@ -47,7 +81,9 @@ def evaluate(config, mode):
 
     ## DEFINE MODEL
     print(toGreen('Building model...'))
-    inputs, outputs = StabNet(config.height, config.width).get_evaluation_model(sample_num)
+    num_control_points = 5
+    param_dim = num_control_points ** 2
+    inputs, outputs = get_evaluation_model(sample_num, param_dim, num_control_points, config.height, config.width)
 
     ## INITIALIZING VARIABLE
     print(toGreen('Initializing variables'))
@@ -56,20 +92,24 @@ def evaluate(config, mode):
     ckpt_manager.load_ckpt(sess, by_score = config.load_ckpt_by_score)
 
     print(toYellow('======== EVALUATION START ========='))
-    test_video_list = np.array(sorted(tl.files.load_file_list(path = config.unstab_path, regx = '.*', printable = False)))
+    offset = '/data1/junyonglee/video_stab/eval'
+    file_path = os.path.join(offset, 'train_unstab')
+    test_video_list = np.array(sorted(tl.files.load_file_list(path = file_path, regx = '.*', printable = False)))
     for k in np.arange(len(test_video_list)):
         test_video_name = test_video_list[k]
-        cap = cv2.VideoCapture(os.path.join(config.unstab_path, test_video_name))
-        fps = cap.get(5)
-        out_h = config.height
-        out_w = config.width
+        eval_path_stab = os.path.join(offset, 'train_stab')
+        eval_path_unstab = os.path.join(offset, 'train_unstab')
 
-        total_frame_num = int(cap.get(7))
-        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+        cap_stab = cv2.VideoCapture(os.path.join(eval_path_stab, test_video_name))
+        cap_unstab = cv2.VideoCapture(os.path.join(eval_path_unstab, test_video_name))
+
+        total_frame_num = int(cap_unstab.get(7))
         base = os.path.basename(test_video_name)
         base_name = os.path.splitext(base)[0]
 
-        out = cv2.VideoWriter(os.path.join(save_path, str(k) + '_' + config.eval_mode + '_' + base_name + '_out.avi'), fourcc, fps, (2 * out_w, out_h))
+        fourcc = cv2.VideoWriter_fourcc('M','J','P','G')
+        fps = cap_unstab.get(5)
+        out = cv2.VideoWriter(os.path.join(save_path, str(k) + '_' + config.eval_mode + '_' + base_name + '_out.avi'), fourcc, fps, (2 * config.width, config.height))
         print(toYellow('reading filename: {}, total frame: {}'.format(test_video_name, total_frame_num)))
 
         # read frame
@@ -77,30 +117,36 @@ def evaluate(config, mode):
             ref, frame = cap.read()
             if ref != False:
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                frame = cv2.resize(frame / 255., (out_w, out_h))
+                frame = cv2.resize(frame / 255., (config.width, config.height))
             return ref, frame
 
         # reading all frames in the video
-        total_frames = []
+        total_frames_stab = []
+        total_frames_unstab = []
         print(toGreen('reading all frames...'))
         while True:
-            ref, frame = read_frame(cap)
-            if ref == False:
+            ref_stab, frame_stab = read_frame(cap_stab)
+            ref_unstab, frame_unstab = read_frame(cap_unstab)
+
+            if ref_stab == False or ref_unstab == False:
                 break
-            total_frames.append(frame)
+
+            total_frames_stab.append(frame_stab)
+            total_frames_unstab.append(frame_unstab)
 
         # duplicate first frames 32 times
         for i in np.arange(skip_length[-1] - skip_length[0]):
-            total_frames.insert(0, total_frames[0])
+            total_frames_unstab[i] = total_frames_stab[i]
 
         print(toGreen('stabilizaing video...'))
-        total_frame_num = len(total_frames)
-        total_frames = np.array(total_frames)
+        total_frame_num = len(total_frames_unstab)
+        total_frames_stab = np.array(total_frames_stab)
+        total_frames_unstab = np.array(total_frames_unstab)
 
         sample_idx = skip_length
         for frame_idx in range(skip_length[-1] - skip_length[0], total_frame_num):
 
-            batch_frames = total_frames[sample_idx]
+            batch_frames = total_frames_unstab[sample_idx]
             batch_frames = np.expand_dims(np.concatenate(batch_frames, axis = 2), axis = 0)
 
             feed_dict = {
@@ -109,21 +155,17 @@ def evaluate(config, mode):
             }
             s_t_pred = np.squeeze(sess.run(outputs['s_t_pred'], feed_dict))
 
-            output = np.uint8(np.concatenate([total_frames[sample_idx[-1]].copy(), s_t_pred], axis = 1) * 255.)
+            output = np.uint8(np.concatenate([total_frames_unstab[sample_idx[-1]].copy(), s_t_pred], axis = 1) * 255.)
             output = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
             out.write(np.uint8(output))
 
-            total_frames[sample_idx[-1]] = s_t_pred
-
-            if frame_idx == skip_length[-1] - skip_length[0]:
-                for i in np.arange(skip_length[-1] - skip_length[0]):
-                    total_frames[i] = s_t_pred
-
+            total_frames_unstab[sample_idx[-1]] = total_frames_stab[sample_idx[-1]]
 
             print('{}/{} {}/{} frame index: {}'.format(k + 1, len(test_video_list), frame_idx, int(total_frame_num - 1), sample_idx), flush = True)
             sample_idx = sample_idx + 1
 
-        cap.release()
+        cap_stab.release()
+        cap_unstab.release()
         out.release()
 
 def handle_directory(config, delete_log):

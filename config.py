@@ -42,7 +42,7 @@ def get_config(mode = ''):
     config.TRAIN.stab_path = os.path.join(offset, 'stab_similarity_frames_origin')
     config.TRAIN.unstab_path = os.path.join(offset, 'unstab_similarity_frames_origin')
     config.TRAIN.of_path = os.path.join(offset, 'optical_flow_s_stabNet')
-    config.TRAIN.surf_path = os.path.join(offset, 'surf_stabNet')
+    config.TRAIN.surf_path = os.path.join(offset, 'surf_stabNet_upgrade')
     # data options
     config.TRAIN.sample_num = 7
     config.TRAIN.skip_length = [0, 16, 24, 28, 30, 31, 32]
@@ -50,6 +50,7 @@ def get_config(mode = ''):
     config.TRAIN.width = config.width
     config.TRAIN.thread_num = config.thread_num
     # logs
+    config.TRAIN.max_ckpt_num = 10
     config.TRAIN.write_ckpt_every_epoch = 1
     config.TRAIN.refresh_image_log_every_itr = 20
     config.TRAIN.refresh_image_log_every_epoch = 2
@@ -70,7 +71,7 @@ def get_config(mode = ''):
 
     #################################### PRETRAIN ###################################
     config.TRAIN.PRETRAIN = edict()
-    config.TRAIN.PRETRAIN.n_epoch = 10000
+    config.TRAIN.PRETRAIN.n_epoch = 10
     # learning rate
     config.TRAIN.PRETRAIN.lr_init = config.TRAIN.lr_init
     config.TRAIN.PRETRAIN.lr_decay_rate = config.TRAIN.lr_decay_rate
@@ -85,6 +86,9 @@ def get_config(mode = ''):
     # data options
     config.TRAIN.PRETRAIN.sample_num = config.TRAIN.sample_num
     config.TRAIN.PRETRAIN.skip_length = config.TRAIN.skip_length
+
+    # logs
+    config.TRAIN.PRETRAIN.write_ckpt_every_itr = 300
     # log dirs
     config.TRAIN.PRETRAIN.LOG_DIR = edict()
     offset = '/Jarvis/logs/junyonglee'
@@ -107,7 +111,7 @@ def get_config(mode = ''):
     config.TRAIN.TEST.stab_path = os.path.join(offset, 'stab_similarity_frames_origin')
     config.TRAIN.TEST.unstab_path = os.path.join(offset, 'unstab_similarity_frames_origin')
     config.TRAIN.TEST.of_path = os.path.join(offset, 'optical_flow_s_stabNet')
-    config.TRAIN.TEST.surf_path = os.path.join(offset, 'surf_stabNet')
+    config.TRAIN.TEST.surf_path = os.path.join(offset, 'surf_stabNet_upgrade')
     # data options
     config.TRAIN.TEST.sample_num = config.TRAIN.sample_num
     config.TRAIN.TEST.skip_length = config.TRAIN.skip_length

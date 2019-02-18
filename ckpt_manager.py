@@ -24,9 +24,10 @@ class CKPT_Manager:
         if by_score:
             file_name = lines[0].split(' ')[0]
         else:
-            file_names = [line.split(' ')[0] for line in lines]
-            file_names.sort()
-            file_name = file_names[-1]
+            # file_names = [line.split(' ')[0] for line in lines]
+            # file_names.sort()
+            # file_name = file_names[-1]
+            file_name = lines[-1].split(' ')[0]
 
         file_path = os.path.join(self.root_dir, file_name)
         tl.files.load_and_assign_npz_dict(name = file_path, sess = sess)
@@ -40,9 +41,24 @@ class CKPT_Manager:
 
         tl.files.save_npz_dict(save_vars, name = save_path, sess = sess)
 
+        # remove the most recently added line
+        if os.path.exists(self.ckpt_list):
+            with open(self.ckpt_list, 'r') as file:
+                lines = file.read().splitlines()
+                line_to_remove  = lines[-1]
+                if line_to_remove not in lines[:-1]:
+                    os.remove(os.path.join(self.root_dir, line_to_remove.split(' ')[0]))
+                del(lines[-1])
+                file.close()
+            with open(self.ckpt_list, 'w') as file:
+                for line in lines:
+                    file.write(line + os.linesep)
+                file.close()
+
         with open(self.ckpt_list, 'a') as file:
-            #file.write(save_path + ' ' + str(score) + os.linesep)
-            file.write(file_name + ' ' + str(score) + os.linesep)
+            line_to_add = file_name + ' ' + str(score) + os.linesep
+            file.write(line_to_add) # for the new ckpt
+            file.write(line_to_add) # for the most recent ckpt
             file.close()
 
         self._update_files()
@@ -54,18 +70,21 @@ class CKPT_Manager:
             file.close()
 
         # sort by score
-        lines = self._sort(lines)
+        line_recent = lines[-1]
+        lines_prev = self._sort(lines[:-1])
 
         # delete ckpt
-        while len(lines) > self.max_files:
-            line_to_remove = lines[len(lines) - 1]
-            os.remove(os.path.join(self.root_dir, line_to_remove.split(' ')[0]))
-            del(lines[len(lines) - 1])
+        while len(lines_prev) > self.max_files:
+            line_to_remove = lines_prev[-1]
+            if line_to_remove != line_recent:
+                os.remove(os.path.join(self.root_dir, line_to_remove.split(' ')[0]))
+            del(lines_prev[-1])
 
         # update ckpt list
         with open(self.ckpt_list, 'w') as file:
-            for line in lines:
+            for line in lines_prev:
                 file.write(line + os.linesep)
+            file.write(line_recent + os.linesep)
             file.close()
 
     def _sort(self, lines):

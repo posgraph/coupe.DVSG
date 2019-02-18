@@ -21,11 +21,11 @@ from ckpt_manager import CKPT_Manager
 def train(config, mode):
     ## Managers
     print(toGreen('Loading checkpoint manager...'))
-    ckpt_manager = CKPT_Manager(config.LOG_DIR.ckpt, mode, 10)
-    ckpt_manager_itr = CKPT_Manager(config.LOG_DIR.ckpt_itr, mode, 10)
-    ckpt_manager_init = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt, mode, 10)
-    ckpt_manager_init_itr = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_itr, mode, 10)
-    ckpt_manager_perm = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_perm, mode, 10)
+    ckpt_manager = CKPT_Manager(config.LOG_DIR.ckpt, mode, config.max_ckpt_num)
+    ckpt_manager_itr = CKPT_Manager(config.LOG_DIR.ckpt_itr, mode, config.max_ckpt_num)
+    ckpt_manager_init = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt, mode, config.max_ckpt_num)
+    ckpt_manager_init_itr = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_itr, mode, config.max_ckpt_num)
+    ckpt_manager_perm = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_perm, mode, 1)
 
     ## DEFINE SESSION
     seed_value = 1
@@ -98,7 +98,7 @@ def train(config, mode):
                     writer_image_init.add_summary(summary_image, global_step)
 
                 # save checkpoint
-                if (global_step) % config.write_ckpt_every_itr == 0:
+                if (global_step) % config.PRETRAIN.write_ckpt_every_itr == 0:
                     ckpt_manager_init_itr.save_ckpt(sess, trainer.pretraining_save_vars, '{:05d}_{:05d}'.format(epoch, global_step), score = errs_total_pretrain['total'] / (idx + 1))
 
                 print_logs('PRETRAIN', mode, epoch, step_time, idx, data_loader.num_itr, errs = errs, coefs = trainer.coef_container, lr = lr)
@@ -166,8 +166,8 @@ def train(config, mode):
         errs = None
         epoch_time = time.time()
         idx = 0
-        while True:
-        #for idx in range(0, 2):
+        #while True:
+        for idx in range(0, 2):
             step_time = time.time()
 
             feed_dict, is_end = data_loader.feed_the_network()
@@ -198,8 +198,8 @@ def train(config, mode):
         errs_total_test = collections.OrderedDict.fromkeys(trainer.loss_test.keys(), 0.)
         epoch_time_test = time.time()
         idx = 0
-        while True:
-        #for idx in range(0, 2):
+        #while True:
+        for idx in range(0, 2):
             step_time = time.time()
 
             feed_dict, is_end = data_loader_test.feed_the_network()
@@ -420,7 +420,7 @@ if __name__ == '__main__':
 
     parser.add_argument('-b', '--batch_size', type = int, default = config_init.TRAIN.batch_size, help = 'whether to train or not')
     parser.add_argument('-gc', '--grad_norm_clip_val', type = float, default = 5., help = 'gradient norm clipping value')
-    parser.add_argument('-lr', '--learning_rate', type = float, default = 1e-2, help = 'learning_rate')
+    parser.add_argument('-lr', '--learning_rate', type = float, default = 1e-3, help = 'learning_rate')
     parser.add_argument('-sk', '--skip_length', type=int, default = config_init.TRAIN.skip_length, help = 'limits of losses that controls coefficients')
 
     parser.add_argument('-la',  '--loss_applied', type = str , default = str(config_init.TRAIN.loss_applied), help = 'losses to use')
@@ -433,7 +433,7 @@ if __name__ == '__main__':
     parser.add_argument('-pt', '--is_pretrain', type = str , default = 'false', help = 'whether to pretrain or not')
     parser.add_argument('-pto', '--pretrain_only', type = str , default = 'false', help = 'whether to pretrain or not')
     parser.add_argument('-pdl', '--pdelete_log', type = str , default = 'false', help = 'whether to delete log or not')
-    parser.add_argument('-plr', '--pretrain_learning_rate', type = float, default = 1e-2, help = 'learning_rate')
+    parser.add_argument('-plr', '--pretrain_learning_rate', type = float, default = None, help = 'learning_rate')
 
     parser.add_argument('-pla',  '--ploss_applied', type = str , default = None, help = 'losses to use')
     parser.add_argument('-plm', '--ploss_limit', type=json.loads, default = None, help = 'limits of losses that controls coefficients')
@@ -445,6 +445,7 @@ if __name__ == '__main__':
     parser.add_argument('-em', '--eval_mode', type=str, default = 'eval', help = 'limits of losses that controls coefficients')
     parser.add_argument('-esk', '--eval_skip_length', type=int, default = config_init.TRAIN.skip_length, help = 'limits of losses that controls coefficients')
 
+    parser.add_argument('-max_ckpt', '--max_ckpt_num', type=int, default = config_init.TRAIN.max_ckpt_num, help = 'number of ckpt to keep')
     parser.add_argument('-ckpt_sc', '--load_ckpt_by_score', type=str, default = config_init.EVAL.load_ckpt_by_score, help = 'limits of losses that controls coefficients')
     args = parser.parse_args()
 
@@ -468,13 +469,15 @@ if __name__ == '__main__':
         config.TRAIN.coef_high = get_dict_with_list(config.TRAIN.loss_applied, args.coef_high) if args.coef_high is not None else config.TRAIN.coef_init
 
         config.TRAIN.PRETRAIN.delete_log = t_or_f(args.pdelete_log)
-        config.TRAIN.PRETRAIN.lr_init = args.pretrain_learning_rate
+        config.TRAIN.PRETRAIN.lr_init = args.pretrain_learning_rate if args.pretrain_learning_rate is not None else args.learning_rate
         config.TRAIN.PRETRAIN.loss_applied = string_to_array(args.ploss_applied) if args.ploss_applied is not None else config.TRAIN.loss_applied
         config.TRAIN.PRETRAIN.loss_limit = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.ploss_limit) if args.ploss_limit is not None else config.TRAIN.loss_limit
         config.TRAIN.PRETRAIN.loss_apply_epoch_range = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.ploss_apply_epoch_range, default_val = config.TRAIN.PRETRAIN.n_epoch) if args.ploss_apply_epoch_range is not None else config.TRAIN.loss_apply_epoch_range
         config.TRAIN.PRETRAIN.coef_low = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.pcoef_low) if args.pcoef_low is not None else config.TRAIN.coef_low
         config.TRAIN.PRETRAIN.coef_high = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.pcoef_high) if args.pcoef_high is not None else config.TRAIN.coef_high
         config.TRAIN.PRETRAIN.coef_init = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.pcoef_init) if args.pcoef_init is not None else config.TRAIN.coef_init
+
+        config.TRAIN.max_ckpt_num = args.max_ckpt_num
 
         print(toWhite('============== CONFIG =============='))
         print_config(config)

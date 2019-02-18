@@ -5,6 +5,7 @@
 3rd_party/*
 utils/*
 pretrained/*
+test/*
 
 # trash
 .dropbox

@@ -190,7 +190,7 @@ class ElasticTransformer(object):
         # batch_size = size[0]
         # num_channels = size[3]
         output = tf.reshape(output, [-1, self.out_size[0], self.out_size[1], num_channels])
-        return output
+        return output, x_s, y_s
 
     def get_abs_theta(self, theta):
         source_points = tf.expand_dims(self.source_points, 0)
