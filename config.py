@@ -50,6 +50,7 @@ def get_config(mode = ''):
     config.TRAIN.width = config.width
     config.TRAIN.thread_num = config.thread_num
     # logs
+    config.TRAIN.max_ckpt_num = 10
     config.TRAIN.write_ckpt_every_epoch = 1
     config.TRAIN.refresh_image_log_every_itr = 20
     config.TRAIN.refresh_image_log_every_epoch = 2

@@ -21,11 +21,11 @@ from ckpt_manager import CKPT_Manager
 def train(config, mode):
     ## Managers
     print(toGreen('Loading checkpoint manager...'))
-    ckpt_manager = CKPT_Manager(config.LOG_DIR.ckpt, mode, 10)
-    ckpt_manager_itr = CKPT_Manager(config.LOG_DIR.ckpt_itr, mode, 10)
-    ckpt_manager_init = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt, mode, 10)
-    ckpt_manager_init_itr = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_itr, mode, 10)
-    ckpt_manager_perm = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_perm, mode, 10)
+    ckpt_manager = CKPT_Manager(config.LOG_DIR.ckpt, mode, config.max_ckpt_num)
+    ckpt_manager_itr = CKPT_Manager(config.LOG_DIR.ckpt_itr, mode, config.max_ckpt_num)
+    ckpt_manager_init = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt, mode, config.max_ckpt_num)
+    ckpt_manager_init_itr = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_itr, mode, config.max_ckpt_num)
+    ckpt_manager_perm = CKPT_Manager(config.PRETRAIN.LOG_DIR.ckpt_perm, mode, 1)
 
     ## DEFINE SESSION
     seed_value = 1
@@ -166,8 +166,8 @@ def train(config, mode):
         errs = None
         epoch_time = time.time()
         idx = 0
-        while True:
-        #for idx in range(0, 2):
+        #while True:
+        for idx in range(0, 2):
             step_time = time.time()
 
             feed_dict, is_end = data_loader.feed_the_network()
@@ -198,8 +198,8 @@ def train(config, mode):
         errs_total_test = collections.OrderedDict.fromkeys(trainer.loss_test.keys(), 0.)
         epoch_time_test = time.time()
         idx = 0
-        while True:
-        #for idx in range(0, 2):
+        #while True:
+        for idx in range(0, 2):
             step_time = time.time()
 
             feed_dict, is_end = data_loader_test.feed_the_network()
@@ -445,6 +445,7 @@ if __name__ == '__main__':
     parser.add_argument('-em', '--eval_mode', type=str, default = 'eval', help = 'limits of losses that controls coefficients')
     parser.add_argument('-esk', '--eval_skip_length', type=int, default = config_init.TRAIN.skip_length, help = 'limits of losses that controls coefficients')
 
+    parser.add_argument('-max_ckpt', '--max_ckpt_num', type=int, default = config_init.TRAIN.max_ckpt_num, help = 'number of ckpt to keep')
     parser.add_argument('-ckpt_sc', '--load_ckpt_by_score', type=str, default = config_init.EVAL.load_ckpt_by_score, help = 'limits of losses that controls coefficients')
     args = parser.parse_args()
 
@@ -475,6 +476,8 @@ if __name__ == '__main__':
         config.TRAIN.PRETRAIN.coef_low = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.pcoef_low) if args.pcoef_low is not None else config.TRAIN.coef_low
         config.TRAIN.PRETRAIN.coef_high = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.pcoef_high) if args.pcoef_high is not None else config.TRAIN.coef_high
         config.TRAIN.PRETRAIN.coef_init = get_dict_with_list(config.TRAIN.PRETRAIN.loss_applied, args.pcoef_init) if args.pcoef_init is not None else config.TRAIN.coef_init
+
+        config.TRAIN.max_ckpt_num = args.max_ckpt_num
 
         print(toWhite('============== CONFIG =============='))
         print_config(config)
