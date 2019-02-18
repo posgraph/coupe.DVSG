@@ -84,6 +84,9 @@ class StabNet:
             outputs['s_t_pred'], outputs['x_offset_t'], outputs['y_offset_t'] = stn(self.inputs['u_t'], outputs['V_src'], outputs['F_t'], [self.h, self.w])
             outputs['s_t_pred_mask'], _, _ = stn(tf.ones_like(self.inputs['u_t']), outputs['V_src'], outputs['F_t'], [self.h, self.w])
 
+            outputs['s_t_1_gt_warp'] = tf_warp(self.inputs['s_t_1_gt'], self.inputs['of_t'], self.h, self.w)
+            outputs['s_t_gt_warp'] = tf_warp(self.inputs['s_t_gt'], self.inputs['of_t'], self.h, self.w)
+
             with tf.variable_scope('correlationNet') as scope:
                 outputs['CM_t_1_pred'] = correlationNet(outputs['s_t_1_pred'], self.inputs['s_t_1_gt'], self.feature_norm, self.correlationNet_model, reuse = self.get_reuse('correlationNet'), scope = scope)
                 outputs['CM_t_1_gt'] = correlationNet(self.inputs['s_t_1_gt'] * outputs['s_t_1_pred_mask'], self.inputs['s_t_1_gt'], self.feature_norm, self.correlationNet_model, reuse = self.get_reuse('correlationNet'), scope = scope)

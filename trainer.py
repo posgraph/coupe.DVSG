@@ -200,10 +200,13 @@ class Trainer:
         image_sum_list.append(tf.summary.image('11_CM_t_1_pred', fix_image_tf(self.outputs_train['CM_t_1_pred'], 1)))
         image_sum_list.append(tf.summary.image('12_CM_t_1_gt', fix_image_tf(self.outputs_train['CM_t_1_gt'], 1)))
 
-        image_sum_list.append(tf.summary.image('13_u_t_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 18:21], 1)))
-        image_sum_list.append(tf.summary.image('14_s_prev_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 15:18], 1)))
-        image_sum_list.append(tf.summary.image('15_u_t_1_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 18:21], 1)))
-        image_sum_list.append(tf.summary.image('16_s_prev_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 15:18], 1)))
+        image_sum_list.append(tf.summary.image('13_s_t_1_gt_warp', fix_image_tf(self.outputs_train['s_t_1_gt_warp'], 1)))
+        image_sum_list.append(tf.summary.image('14_s_t_gt_warp', fix_image_tf(self.outputs_train['s_t_gt_warp'], 1)))
+
+        # image_sum_list.append(tf.summary.image('13_u_t_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 18:21], 1)))
+        # image_sum_list.append(tf.summary.image('14_s_prev_in_patch_t', fix_image_tf(self.outputs_train['patches_masked_t'][:, :, :, 15:18], 1)))
+        # image_sum_list.append(tf.summary.image('15_u_t_1_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 18:21], 1)))
+        # image_sum_list.append(tf.summary.image('16_s_prev_in_patch_t_1', fix_image_tf(self.outputs_train['patches_masked_t_1'][:, :, :, 15:18], 1)))
 
         image_sum = tf.summary.merge(image_sum_list)
 
